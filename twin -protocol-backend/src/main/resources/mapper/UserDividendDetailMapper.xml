@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zmyc.infrastructure.mapper.UserDividendDetailMapper">
+
+    <insert id="batchInsert" parameterType="list">
+        INSERT INTO user_dividend_detail
+        (dividend_id, user_id, miner_count, tip_amount, status, created_date, last_updated_date)
+        VALUES
+        <foreach collection="list" item="item" separator=",">
+            (#{item.dividendId}, #{item.userId}, #{item.minerCount}, #{item.tipAmount},
+             #{item.status}, #{item.createdDate}, #{item.lastUpdatedDate})
+        </foreach>
+    </insert>
+
+</mapper>

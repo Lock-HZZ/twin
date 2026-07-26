@@ -1,0 +1,14 @@
+target/
+# IntelliJ related
+*.iml
+*.ipr
+*.iws
+*.md
+.idea/
+
+
+.vscode
+*.log
+.metals
+.bloop
+/.cursor

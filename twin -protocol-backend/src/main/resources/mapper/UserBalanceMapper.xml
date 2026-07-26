@@ -1,0 +1,25 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+        "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.zmyc.infrastructure.mapper.UserBalanceMapper">
+
+    <!-- 批量 CASE WHEN UPDATE（分红发放，高效无锁竞争） -->
+    <update id="batchAddBalance">
+        UPDATE user_balance
+        SET
+            balance = balance + CASE user_id
+                <foreach collection="list" item="item">
+                    WHEN #{item.userId} THEN #{item.balance}
+                </foreach>
+                ELSE 0
+            END,
+            version = version + 1,
+            last_updated_date = #{now}
+        WHERE token_id = #{tokenId}
+          AND user_id IN
+        <foreach collection="list" item="item" open="(" separator="," close=")">
+            #{item.userId}
+        </foreach>
+    </update>
+
+</mapper>

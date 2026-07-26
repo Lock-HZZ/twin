@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npx hardhat *)",
+      "PowerShell(npx hardhat compile 2>&1)"
+    ]
+  }
+}

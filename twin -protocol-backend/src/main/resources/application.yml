@@ -1,0 +1,122 @@
+server:
+  port: 8080
+  servlet:
+    context-path: /bolt-tiger
+
+spring:
+  application:
+    name: bolt-tiger
+
+  datasource:
+    url: jdbc:mysql://187.127.108.248:3306/benefer?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+    driver-class-name: com.mysql.cj.jdbc.Driver
+    username: root
+    password: b2a577e2949b5e8c
+
+  data:
+    redis:
+      password: duolaimi123
+      host: 187.127.108.248
+      port: 6379
+      database: 7
+
+  quartz:
+    job-store-type: jdbc
+    wait-for-jobs-to-complete-on-shutdown: false
+    overwrite-existing-jobs: true
+    auto-startup: true
+    startup-delay: 0s
+    jdbc:
+      initialize-schema: never
+    properties:
+      org:
+        quartz:
+          scheduler:
+            instanceName: bolt-tiger-prod
+            instanceId: AUTO
+          jobStore:
+            class: org.springframework.scheduling.quartz.LocalDataSourceJobStore
+            driverDelegateClass: org.quartz.impl.jdbcjobstore.StdJDBCDelegate
+            # 表前缀
+            tablePrefix: qrtz_
+            # 是否开启集群
+            isClustered: true
+            dataSource: quartz
+            clusterCheckinInterval: 10000
+            useProperties: true
+          threadPool:
+            class: org.quartz.simpl.SimpleThreadPool
+            threadCount: 10
+            threadPriority: 5
+            threadsInheritContextClassLoaderOfInitializingThread: true
+
+# JWT配置
+jwt:
+  secret: y!S@ec#etK$e1pi$jsj120jkD06AKndjsg9867SKdfb#@sd
+  expiration: 86400000
+
+#ak sk
+aksk:
+  enabled: true
+  signature-expiration: 300
+  accessKey: AK123456
+  secretKey: SK123456
+
+LOG_LEVEL: info
+
+# 入金签名配置（对应合约 Deposit.sol 的 EIP-712 域）
+deposit:
+  # signer 私钥（合约 signer 地址对应的私钥），生产环境请用环境变量注入
+  signer-private-key: ${DEPOSIT_SIGNER_PRIVATE_KEY:0x0000000000000000000000000000000000000000000000000000000000000000}
+  # 入金合约地址（EIP-712 verifyingContract）
+  contract-address: ${DEPOSIT_CONTRACT_ADDRESS:0x0000000000000000000000000000000000000000}
+  # 链ID
+  chain-id: ${DEPOSIT_CHAIN_ID:56}
+  domain-name: TwinProtocolDeposit
+  domain-version: "1"
+  # 签名有效期（秒）
+  signature-ttl-seconds: 600
+
+
+web3:
+  chains:
+    eni:
+      - https://infra.enirpc.com
+
+    bsc:
+      - https://neat-clean-flower.bsc.quiknode.pro/950f99f2e6bc7455e18e2e401f1581a4a75664ec
+
+bamboo:
+  is-open: true
+  auto-initialize-schema: true
+  auto-initialize-check-point: false
+  auto-start-engine: false
+  schedule-initial-seconds: 10
+  schedule-delay-seconds: 5
+  unprocessed-retry-seconds: 300
+  blockchains:
+    bsc:
+      id: 56
+      rpc-node-url: https://neat-clean-flower.bsc.quiknode.pro/950f99f2e6bc7455e18e2e401f1581a4a75664ec
+      event-listener:
+        contract-event-definitions:
+          "0x651FC65f0668814943a2F1fa297D6fb337A14027":
+            - signature: "DepositCompleted(address indexed user,uint256 usdtAmount,uint256 bnbAmount,uint256 vUsdtAmount,address feeRecipient,uint256 timestamp,bool isBnbPayment)"
+              signature-hash: "0x97bdbc327aad5c6f07720ab75127277171f6b6f9f0abb9b2f56638c216422d6c"
+              description: "普通入金"
+            - signature: "BuyTokenWithUSDTBySignature(address indexed user,uint256 usdtAmount,uint256 eniAmt,uint256 nonce,uint256 timestamp)"
+              signature-hash: "0xaa504756167a16847d98e65137aa0cb67bdc000bfd986fc17d44089a1319ecff"
+              description: "签名入金"
+            - signature: "CombinationPayment(address indexed user,uint256 totalValue,uint256 usdtAmount,uint256 eniAmount,uint256 vUsdtAmount,address feeRecipient,uint256 timestamp)"
+              signature-hash: "0xb6f2bdfc62d1f9d19e9d2cf6edf9342ed4329498639c082407e7713450c415bd"
+              description: "eni链上入金"
+
+          "0x173e7171d4188d6d8faa0889454b0170d835278a":
+            - signature: "Deposit(address indexed orderId, address indexed user, uint256 usdtAmount, uint256 receiveAmount, uint256 holdAmount, uint256 nonce, uint256 endTime)"
+              signature-hash: "0x43dc06ba2618bd5673fac59bcb0e7e7a6e291bfc4f46aa6e6cebf29c15cad124"
+              description: "提现转入"
+springdoc:
+  api-docs:
+    enabled: false
+  swagger-ui:
+    enabled: false
