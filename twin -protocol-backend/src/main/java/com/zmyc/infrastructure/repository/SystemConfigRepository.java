@@ -27,31 +27,6 @@ public class SystemConfigRepository {
         }
     }
 
-    /** 获取矿机单价（USDC） */
-    public BigDecimal getMinerCardPrice() {
-        SystemConfigDO config = configMapper.findByKey(SystemConfigKey.MINER_CARD_PRICE);
-        if (config == null) {
-            return BigDecimal.valueOf(100.0);
-        }
-        try {
-            return new BigDecimal(config.getConfigValue());
-        } catch (NumberFormatException e) {
-            return BigDecimal.valueOf(100.0);
-        }
-    }
-
-    /** 获取矿机挖矿天数 */
-    public int getMinerMiningDays() {
-        SystemConfigDO config = configMapper.findByKey(SystemConfigKey.MINER_MINING_DAYS);
-        if (config == null) {
-            return 30; // 默认30天
-        }
-        try {
-            return Integer.parseInt(config.getConfigValue());
-        } catch (NumberFormatException e) {
-            return 30;
-        }
-    }
 
     /** 获取每日最大入金额度（USDC） */
     public BigDecimal getDailyMaxDeposit() {

@@ -44,4 +44,12 @@ public class DepositController {
 
         return ApiResponse.success("获取额度信息成功", response);
     }
+
+   /* @Operation(summary = "获取用户入金列表")
+    @GetMapping("/list")
+    public ApiResponse<List<UserDepositResponse>> getDepositList() {
+        Long userId = UserContext.getCurrentUserId();
+        List<UserDepositResponse> depositList = userDepositService.getUserDepositList(userId);
+        return ApiResponse.success("获取入金列表成功", depositList);
+    }*/
 }

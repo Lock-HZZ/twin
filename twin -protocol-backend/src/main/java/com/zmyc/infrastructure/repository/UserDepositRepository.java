@@ -89,4 +89,11 @@ public class UserDepositRepository {
                .set(UserDepositDO::getStatus, UserDepositDO.Status.EXPIRED);
         return depositMapper.update(null, wrapper);
     }
+
+    public UserDepositDO findByNonce(Long nonce) {
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getNonce, nonce)
+                .eq(UserDepositDO::getStatus, UserDepositDO.Status.PENDING);
+        return depositMapper.selectOne(wrapper);
+    }
 }

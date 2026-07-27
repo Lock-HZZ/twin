@@ -24,8 +24,6 @@ public class UserDepositDO extends BaseDO {
 
     private Integer minerCount;
 
-    private BigDecimal minerPriceUSDC;
-
     private BigDecimal energyEarned;
 
     private BigDecimal energyMultiplier;

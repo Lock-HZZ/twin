@@ -58,6 +58,9 @@ public class UserDepositService {
     @Autowired
     private DepositConfig depositConfig;
 
+    @Autowired
+    private UserRelationService userRelationService;
+
     /**
      * 校验入金规则并生成 EIP-712 签名，前端凭签名调用合约 depositWithSig。
      *
@@ -136,6 +139,48 @@ public class UserDepositService {
         response.setFunctionType(FUNC_DEPOSIT);
         response.setSignature(signature);
         return response;
+    }
+
+    /**
+     * 处理链上入金事件
+     *
+     * @param nonce 入金订单的随机数
+     * @param amount 入金数量（USDC）
+     * @param txHash 交易哈希
+     */
+    @Transactional
+    public void processDeposit(Long nonce, BigDecimal amount, String txHash) {
+
+        // 检查交易是否已处理
+        UserDepositDO existingDeposit = depositRepository.findByTxHash(txHash);
+        if (existingDeposit != null) {
+            log.warn("入金交易已存在，跳过处理: txHash={}", txHash);
+            return;
+        }
+
+        UserDepositDO deposit = depositRepository.findByNonce(nonce);
+
+        // 获取能量倍率
+        BigDecimal energyMultiplier = systemConfigRepository.getDepositEnergyMultiplier();
+
+        // 计算能量值
+        BigDecimal energyEarned = amount.multiply(energyMultiplier);
+
+        // 创建入金记录
+
+        deposit.setTxHash(txHash);
+        deposit.setEnergyEarned(energyEarned);
+        deposit.setEnergyMultiplier(energyMultiplier);
+        deposit.setStatus(UserDepositDO.Status.COMPLETED);
+        depositRepository.save(deposit);
+
+        log.info("创建入金记录: nonce={}, amount={} USDC, energyEarned={}",
+                nonce, amount, energyEarned);
+
+        // 触发业绩统计和能量值增加
+        userRelationService.onDeposit(deposit.getUserId(), amount, deposit.getId());
+
+        log.info("入金处理完成: userId={}, txHash={}, nonce={}", deposit.getUserId(), txHash, nonce);
     }
 
     /**
