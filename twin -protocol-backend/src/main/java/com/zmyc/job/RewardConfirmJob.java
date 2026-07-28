@@ -1,6 +1,7 @@
 package com.zmyc.job;
 
-import com.zmyc.service.UserStakeService;
+import com.zmyc.service.RewardService;
+import com.zmyc.service.TipBurnService;
 import lombok.extern.slf4j.Slf4j;
 import org.quartz.Job;
 import org.quartz.JobExecutionContext;
@@ -9,23 +10,23 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Component;
 
 /**
- * 质押分红发放任务（每天凌晨1点执行）
+ * TIP燃烧确认任务
+ * 每5分钟执行一次，监控和补偿未完成的燃烧记录
  */
 @Component
 @Slf4j
-public class StakeScheduledTasks implements Job {
-
+public class RewardConfirmJob implements Job {
 
     @Autowired
-    private UserStakeService userStakeService;
+    private RewardService rewardService;
 
+    @Override
     public void execute(JobExecutionContext context) throws JobExecutionException {
-        log.info("开始执行质押分红定时任务");
         try {
-            userStakeService.generateAndDistributeDailyDividends();
-            log.info("质押分红定时任务执行成功");
+            rewardService.reconcileDividends();
         } catch (Exception e) {
-            log.error("质押分红定时任务执行失败", e);
+            log.error("奖励上链任务失败", e);
+            throw new JobExecutionException(e);
         }
     }
 }

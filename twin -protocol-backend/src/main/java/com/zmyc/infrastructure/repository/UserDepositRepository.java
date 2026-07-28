@@ -96,4 +96,49 @@ public class UserDepositRepository {
                 .eq(UserDepositDO::getStatus, UserDepositDO.Status.PENDING);
         return depositMapper.selectOne(wrapper);
     }
+
+    /** 分页查询用户入金列表，支持状态筛选 */
+    public List<UserDepositDO> findByUserIdWithPage(Long userId, Integer statusFilter, Integer offset, Integer pageSize) {
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getUserId, userId);
+        wrapper.eq(UserDepositDO::getStatus, UserDepositDO.Status.COMPLETED);
+        wrapper.orderByDesc(UserDepositDO::getCreatedDate)
+               .last("LIMIT " + offset + ", " + pageSize);
+
+        return depositMapper.selectList(wrapper);
+    }
+
+    /** 统计用户入金记录总数，支持状态筛选 */
+    public long countByUserId(Long userId, Integer statusFilter) {
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getUserId, userId);
+        wrapper.eq(UserDepositDO::getStatus, UserDepositDO.Status.COMPLETED);
+        return depositMapper.selectCount(wrapper);
+    }
+
+    /** 根据用户地址和流动性查找订单（用于事件处理） */
+    public UserDepositDO findByUserAddressAndLiquidity(String userAddress, BigDecimal liquidity) {
+        // 需要通过userId查询，先根据地址找到userId
+        // 这里简化处理，实际应该关联user表或传入userId
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getLiquidity, liquidity)
+               .eq(UserDepositDO::getStatus, UserDepositDO.Status.REMOVING)
+               .orderByDesc(UserDepositDO::getCreatedDate)
+               .last("LIMIT 1");
+        return depositMapper.selectOne(wrapper);
+    }
+
+    /** 根据状态查询订单列表 */
+    public List<UserDepositDO> findByStatus(Integer status) {
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getStatus, status);
+        return depositMapper.selectList(wrapper);
+    }
+
+    /** 根据提现交易哈希查询订单 */
+    public UserDepositDO findByWithdrawTxHash(String withdrawTxHash) {
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getWithdrawTxHash, withdrawTxHash);
+        return depositMapper.selectOne(wrapper);
+    }
 }

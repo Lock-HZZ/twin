@@ -5,17 +5,6 @@
 ALTER TABLE `users`
 ADD COLUMN `role` INT NOT NULL DEFAULT 0 COMMENT '用户角色：0-普通用户, 1-黄金节点, 2-钻石节点, 3-皇冠节点, 4-合伙人';
 
--- Nonce 防重放表
-CREATE TABLE IF NOT EXISTS `deposit_nonce` (
-  `id` BIGINT NOT NULL AUTO_INCREMENT COMMENT '主键',
-  `user_id` BIGINT NOT NULL COMMENT '用户ID',
-  `nonce` BIGINT NOT NULL COMMENT '随机数（uint256）',
-  `used_at` BIGINT NOT NULL COMMENT '使用时间戳（秒）',
-  PRIMARY KEY (`id`),
-  UNIQUE KEY `uk_user_nonce` (`user_id`, `nonce`),
-  KEY `idx_used_at` (`used_at`)
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COMMENT='入金 nonce 防重放表';
-
 -- 在 user_deposit 表增加 nonce 和 expires_at 字段（如果表已存在）
 ALTER TABLE `user_deposit`
 ADD COLUMN `nonce` BIGINT COMMENT '签名 nonce' AFTER `weight`,

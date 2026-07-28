@@ -34,6 +34,13 @@ public enum ErrorCode {
     DEPOSIT_NONCE_USED(5005, "error.deposit.nonce.used"),
     DEPOSIT_SIGNATURE_EXPIRED(5006, "error.deposit.signature.expired"),
     DEPOSIT_SIGNATURE_INVALID(5007, "error.deposit.signature.invalid"),
+    DEPOSIT_NOT_FOUND(5008, "error.deposit.not.found"),
+    DEPOSIT_NOT_BELONG_TO_USER(5009, "error.deposit.not.belong.to.user"),
+    DEPOSIT_NOT_COMPLETED(5010, "error.deposit.not.completed"),
+    WITHDRAW_AMOUNT_INVALID(5011, "error.withdraw.amount.invalid"),
+    WITHDRAW_AMOUNT_EXCEEDS_LIQUIDITY(5012, "error.withdraw.amount.exceeds.liquidity"),
+    DEPOSIT_ALREADY_PROCESSING(5013, "error.deposit.already.processing"),
+    CONTRACT_CALL_FAILED(5014, "error.contract.call.failed"),
 
     // ========== 质押相关错误 6000-6999 ==========
     STAKE_PLAN_INVALID(6001, "error.stake.plan.invalid"),

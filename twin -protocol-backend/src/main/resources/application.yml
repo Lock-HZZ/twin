@@ -77,15 +77,6 @@ deposit:
   # 签名有效期（秒）
   signature-ttl-seconds: 600
 
-
-web3:
-  chains:
-    eni:
-      - https://infra.enirpc.com
-
-    bsc:
-      - https://neat-clean-flower.bsc.quiknode.pro/950f99f2e6bc7455e18e2e401f1581a4a75664ec
-
 bamboo:
   is-open: true
   auto-initialize-schema: true
@@ -101,12 +92,23 @@ bamboo:
       event-listener:
         contract-event-definitions:
           "0x173e7171d4188d6d8faa0889454b0170d835278a":
-            - signature: "DepositExecuted(address indexed user, uint256 usdcAmount, uint256 toDividend, uint256 tipBought, uint256 liquidity, uint256 dustUSDC, uint256 dustTIP)"
+            - signature: "DepositExecuted(uint256 indexed stakeId, address indexed user, uint256 usdcAmount, uint256 toDividend, uint256 tipBought, uint256 liquidity, uint256 dustUSDC, uint256 dustTIP)"
               signature-hash: "0x3e1f8c5d4b6f9e2a1c3b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5g"
-              description: "质押入金事件"
+              description: "入金事件"
+          "0x173e7171d4188d6d8faa0889454b0170d835278b":
+            - signature: "Staked(address indexed user, uint256 amount, uint256 plan, uint256 startTime, uint256 endTime)"
+              signature-hash: "0x4f5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a"
+              description: "质押事件"
+            - signature: "Withdrawn(uint256 indexed stakeId, address indexed user, uint256 amount)"
+              signature-hash: "0x4f5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a"
+              description: "解押事件"
 
 springdoc:
   api-docs:
     enabled: false
   swagger-ui:
     enabled: false
+
+system:
+  start:
+    timestamp: 1785081600

@@ -218,6 +218,7 @@ contract Trade is
     function removeLiquidity(
         address user,
         uint256 amount,
+        uint256 lockDuration,
         uint256 deadline
     ) external onlyOperator nonReentrant returns (uint256 usdcOut, uint256 tipToDividend) {
         require(amount > 0, "Zero liquidity");
@@ -244,7 +245,15 @@ contract Trade is
             deadline
         );
 
-        usdcOut = amountUSDC;
+
+        if (lockDuration <= 60) {
+            usdcOut = amountUSDC * 8 / 10; // 80% of USDC
+        } else if (lockDuration <= 180) {
+            usdcOut = amountUSDC * 9 / 10; // 90% of USDC
+        } else {
+            usdcOut = amountUSDC;
+        }
+
         if (usdcOut > 0) {
             require(USDC.transfer(user, usdcOut), "USDC transfer failed");
         }

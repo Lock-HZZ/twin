@@ -18,30 +18,8 @@ public class BlockchainChainRepository {
 
     /** 查询所有启用的链配置 */
     public List<BlockchainChainDO> findAllEnabled() {
-        return chainMapper.findAllEnabled();
-    }
-
-    /** 根据链ID查询配置 */
-    public BlockchainChainDO findByChainId(Long chainId) {
         LambdaQueryWrapper<BlockchainChainDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(BlockchainChainDO::getChainId, chainId);
-        BlockchainChainDO chain = chainMapper.selectOne(wrapper);
-        if (chain == null) {
-            throw new BusinessException(ErrorCode.SYSTEM_ERROR);
-        }
-        return chain;
-    }
-
-    /** 保存链配置 */
-    public void save(BlockchainChainDO chain) {
-        long now = System.currentTimeMillis() / 1000;
-        if (chain.getId() == null) {
-            chain.setCreatedDate(now);
-            chain.setLastUpdatedDate(now);
-            chainMapper.insert(chain);
-        } else {
-            chain.setLastUpdatedDate(now);
-            chainMapper.updateById(chain);
-        }
+        wrapper.eq(BlockchainChainDO::getEnabled, true);
+        return chainMapper.selectList(wrapper);
     }
 }

@@ -80,7 +80,7 @@ public class DepositExecutedProcessor implements EventProcessor<DepositExecutedM
     public void doBusinessLogic(Object model) {
         DepositExecutedModel depositExecutedModel = (DepositExecutedModel) model;
         log.info("Processing DepositExecutedModel event: hash={}", depositExecutedModel.getTxHash());
-        depositService.processDeposit(depositExecutedModel.getNonce(), depositExecutedModel.getUsdcAmount(), depositExecutedModel.getTxHash());
+        depositService.processDeposit(depositExecutedModel.getNonce(), depositExecutedModel.getLiquidity(), depositExecutedModel.getUsdcAmount(), depositExecutedModel.getTxHash());
     }
 
 }

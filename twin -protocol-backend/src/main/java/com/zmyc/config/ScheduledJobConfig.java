@@ -25,6 +25,9 @@ public class ScheduledJobConfig implements ApplicationRunner {
         initDepositExpirationJob();
         initStakeDividendJob();
         initStakeDividendReconcileJob();
+        initRemoveLiquidityConfirmJob();
+        initDailyBurnJob();
+        initBurnConfirmJob();
     }
 
     /**
@@ -97,6 +100,78 @@ public class ScheduledJobConfig implements ApplicationRunner {
             }
         } catch (Exception e) {
             log.error("质押分红补偿任务注册失败", e);
+        }
+    }
+
+    /**
+     * 初始化移除LP回执确认任务
+     * 每30秒执行一次：轮询 REMOVING 订单回执，确认或重置状态
+     */
+    private void initRemoveLiquidityConfirmJob() {
+        try {
+            String jobName = "removeLiquidityConfirmJob";
+            String jobGroup = "depositGroup";
+            String triggerName = "removeLiquidityConfirmTrigger";
+            String triggerGroup = "depositGroup";
+            String jobClass = "RemoveLiquidityConfirmJob";
+            String cron = "0/30 * * * * ?"; // 每30秒执行一次
+
+            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
+                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
+                log.info("移除LP回执确认任务注册成功: cron={}", cron);
+            } else {
+                log.info("移除LP回执确认任务已存在，跳过注册");
+            }
+        } catch (Exception e) {
+            log.error("移除LP回执确认任务注册失败", e);
+        }
+    }
+
+    /**
+     * 初始化每日TIP燃烧任务
+     * 每天23:00执行：计算燃烧比例并调用合约燃烧TIP
+     */
+    private void initDailyBurnJob() {
+        try {
+            String jobName = "dailyBurnJob";
+            String jobGroup = "burnGroup";
+            String triggerName = "dailyBurnTrigger";
+            String triggerGroup = "burnGroup";
+            String jobClass = "DailyBurnJob";
+            String cron = "0 0 23 * * ?"; // 每天23:00执行
+
+            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
+                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
+                log.info("每日TIP燃烧任务注册成功: cron={}", cron);
+            } else {
+                log.info("每日TIP燃烧任务已存在，跳过注册");
+            }
+        } catch (Exception e) {
+            log.error("每日TIP燃烧任务注册失败", e);
+        }
+    }
+
+    /**
+     * 初始化燃烧确认补偿任务
+     * 每5分钟执行一次：监控和补偿未完成的燃烧记录
+     */
+    private void initBurnConfirmJob() {
+        try {
+            String jobName = "burnConfirmJob";
+            String jobGroup = "burnGroup";
+            String triggerName = "burnConfirmTrigger";
+            String triggerGroup = "burnGroup";
+            String jobClass = "BurnConfirmJob";
+            String cron = "0 */5 * * * ?"; // 每5分钟执行一次
+
+            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
+                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
+                log.info("TIP燃烧补偿任务注册成功: cron={}", cron);
+            } else {
+                log.info("TIP燃烧补偿任务已存在，跳过注册");
+            }
+        } catch (Exception e) {
+            log.error("TIP燃烧补偿任务注册失败", e);
         }
     }
 }

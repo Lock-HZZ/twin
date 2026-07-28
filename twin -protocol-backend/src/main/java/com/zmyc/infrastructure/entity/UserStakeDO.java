@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 
 @Data
 @TableName("user_stake")
-public class UserStakeDO {
+public class UserStakeDO extends BaseDO{
 
     @TableId(type = IdType.AUTO)
     private Long id;
@@ -40,12 +40,6 @@ public class UserStakeDO {
 
     /** 交易哈希 */
     private String txHash;
-
-    /** 创建时间（秒） */
-    private Long createdDate;
-
-    /** 更新时间（秒） */
-    private Long updatedDate;
 
     /** 状态常量 */
     public static class Status {

@@ -1,8 +1,11 @@
 package com.zmyc.service;
 
 import com.zmyc.application.vo.response.DepositResponse;
+import com.zmyc.application.vo.response.PageResponse;
+import com.zmyc.application.vo.response.UserDepositResponse;
 import com.zmyc.common.config.DepositConfig;
 import com.zmyc.common.context.UserContext;
+import com.zmyc.common.enums.Decimals;
 import com.zmyc.common.enums.ErrorCode;
 import com.zmyc.common.exception.BusinessException;
 import com.zmyc.common.util.Eip712DepositSigner;
@@ -10,26 +13,24 @@ import com.zmyc.common.util.TimeUtils;
 import com.zmyc.domain.bo.UserQuotaInfo;
 import com.zmyc.infrastructure.entity.*;
 import com.zmyc.infrastructure.repository.*;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Value;
+import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.math.RoundingMode;
-import java.security.SecureRandom;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 
 @Service
+@Slf4j
 public class UserDepositService {
-
-    private static final Logger log = LoggerFactory.getLogger(UserDepositService.class);
-
-    /** USDC 精度：6 位小数 */
-    private static final BigInteger USDC_DECIMALS = BigInteger.TEN.pow(6);
 
     /** 合约功能类型：入金固定为 2 */
     private static final int FUNC_DEPOSIT = 2;
@@ -38,16 +39,12 @@ public class UserDepositService {
     private static final BigDecimal DEPOSIT_STEP = BigDecimal.valueOf(100);
     private static final BigDecimal UNLIMITED_QUOTA = BigDecimal.valueOf(999999999L);
 
-    private final SecureRandom secureRandom = new SecureRandom();
 
     @Autowired
     private UserDepositRepository depositRepository;
 
     @Autowired
     private UserRepository userRepository;
-
-    @Autowired
-    private DepositNonceRepository depositNonceRepository;
 
     @Autowired
     private SystemConfigRepository systemConfigRepository;
@@ -60,6 +57,12 @@ public class UserDepositService {
 
     @Autowired
     private UserRelationService userRelationService;
+
+    @Autowired
+    private RedisTemplate<String, Object> redisTemplate;
+
+    @Value("${system.start.timestamp}")
+    private long systemStartTimestamp;
 
     /**
      * 校验入金规则并生成 EIP-712 签名，前端凭签名调用合约 depositWithSig。
@@ -99,7 +102,7 @@ public class UserDepositService {
         BigInteger nonce = generateUniqueNonce(userId);
 
         // 6. 计算权重
-        BigDecimal weight = calculateWeight(user);
+        BigDecimal weight = calculateWeight();
 
         // 7. 写入 PENDING 入金记录，占用额度（链上事件确认后置为 COMPLETED）
         UserDepositDO deposit = new UserDepositDO();
@@ -113,7 +116,7 @@ public class UserDepositService {
 
         // 8. 生成 EIP-712 签名
         long deadline = System.currentTimeMillis() / 1000 + depositConfig.getSignatureTtlSeconds();
-        BigInteger amountWei = amount.toBigInteger().multiply(USDC_DECIMALS);
+        BigInteger amountWei = amount.toBigInteger().multiply(new BigInteger(Decimals.USDC.value + "")); // 转换为最小单位（USDC 6位小数）
 
         String signature = Eip712DepositSigner.sign(
                 depositConfig.getSignerPrivateKey(),
@@ -149,7 +152,7 @@ public class UserDepositService {
      * @param txHash 交易哈希
      */
     @Transactional
-    public void processDeposit(Long nonce, BigDecimal amount, String txHash) {
+    public void processDeposit(Long nonce, BigDecimal liquidity, BigDecimal amount, String txHash) {
 
         // 检查交易是否已处理
         UserDepositDO existingDeposit = depositRepository.findByTxHash(txHash);
@@ -166,9 +169,9 @@ public class UserDepositService {
         // 计算能量值
         BigDecimal energyEarned = amount.multiply(energyMultiplier);
 
-        // 创建入金记录
-
+        // 更新入金记录
         deposit.setTxHash(txHash);
+        deposit.setLiquidity(liquidity);
         deposit.setEnergyEarned(energyEarned);
         deposit.setEnergyMultiplier(energyMultiplier);
         deposit.setStatus(UserDepositDO.Status.COMPLETED);
@@ -260,8 +263,9 @@ public class UserDepositService {
     /**
      * 计算权重：1 + 注册天数 × 增长率
      */
-    private BigDecimal calculateWeight(UserDO user) {
-        long days = daysSinceRegistration(user);
+    private BigDecimal calculateWeight() {
+        long now = System.currentTimeMillis() / 1000;
+        long days = Math.max(0, (now - systemStartTimestamp) / (24 * 60 * 60));
         BigDecimal growthRate = systemConfigRepository.getWeightGrowthRate();
         return BigDecimal.ONE
                 .add(growthRate.multiply(BigDecimal.valueOf(days)))
@@ -279,19 +283,9 @@ public class UserDepositService {
      * 生成唯一 nonce 并入库
      */
     private BigInteger generateUniqueNonce(Long userId) {
-        for (int i = 0; i < 5; i++) {
-            long candidate = Math.abs(secureRandom.nextLong() % 1_000_000_000_000_000L)
-                    + System.currentTimeMillis();
-            if (!depositNonceRepository.isNonceUsed(userId, candidate)) {
-                DepositNonceDO nonceDO = new DepositNonceDO();
-                nonceDO.setUserId(userId);
-                nonceDO.setNonce(candidate);
-                nonceDO.setUsedAt(System.currentTimeMillis() / 1000);
-                depositNonceRepository.save(nonceDO);
-                return BigInteger.valueOf(candidate);
-            }
-        }
-        throw new BusinessException(ErrorCode.DEPOSIT_NONCE_USED);
+        String key = "deposit:nonce:" + userId;
+        Long nonce = redisTemplate.opsForValue().increment(key);
+        return BigInteger.valueOf(nonce);
     }
 
     /**
@@ -335,5 +329,52 @@ public class UserDepositService {
             log.info("入金订单过期清理：已取消 {} 个订单并释放额度", count);
         }
         return count;
+    }
+
+    /**
+     * 分页查询用户入金列表
+     *
+     * @param userId 用户ID
+     * @param statusFilter 状态筛选：1-持仓中(COMPLETED)，3-已出局(EXPIRED/FAILED)，null-全部
+     * @param page 页码，从1开始
+     * @param pageSize 每页数量
+     * @return 分页结果
+     */
+    public PageResponse<UserDepositResponse> getUserDepositList(Long userId, Integer statusFilter, Integer page, Integer pageSize) {
+        int offset = (page - 1) * pageSize;
+
+        List<UserDepositDO> deposits = depositRepository.findByUserIdWithPage(userId, statusFilter, offset, pageSize);
+        long total = depositRepository.countByUserId(userId, statusFilter);
+
+        long now = System.currentTimeMillis() / 1000;
+
+        List<UserDepositResponse> responseList = deposits.stream().map(deposit -> {
+            UserDepositResponse response = new UserDepositResponse();
+            response.setId(deposit.getId());
+            response.setLiquidity(deposit.getLiquidity());
+            response.setAmount(deposit.getAmount());
+            response.setWeight(deposit.getWeight());
+
+            // 订单总权重 = 权重参数 * 订单价值
+            BigDecimal totalWeight = deposit.getWeight() != null && deposit.getAmount() != null
+                ? deposit.getWeight().multiply(deposit.getAmount())
+                : BigDecimal.ZERO;
+            response.setTotalWeight(totalWeight);
+
+            // 持仓天数 = (当前时间 - 创建时间) / 86400
+            long holdingDays = 0;
+            if (deposit.getCreatedDate() != null) {
+                holdingDays = (now - deposit.getCreatedDate()) / (24 * 60 * 60);
+            }
+            response.setHoldingDays(holdingDays);
+
+            response.setTxHash(deposit.getTxHash());
+            response.setStatus(deposit.getStatus());
+            response.setCreatedDate(deposit.getCreatedDate());
+
+            return response;
+        }).collect(Collectors.toList());
+
+        return new PageResponse<>(responseList, total, page, pageSize);
     }
 }

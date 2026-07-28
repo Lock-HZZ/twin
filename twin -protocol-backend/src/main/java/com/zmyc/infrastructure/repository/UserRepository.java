@@ -81,4 +81,36 @@ public class UserRepository {
                 .collect(Collectors.toMap(UserDO::getId, UserDO::getAddress));
     }
 
+    /**
+     * 根据角色列表查询用户
+     */
+    public List<UserDO> findByRoles(List<Integer> roles) {
+        if (roles == null || roles.isEmpty()) {
+            return Collections.emptyList();
+        }
+        LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.in(UserDO::getRole, roles);
+        return userMapper.selectList(wrapper);
+    }
+
+    /**
+     * 根据单个角色查询用户
+     */
+    public List<UserDO> findByRole(Integer role) {
+        LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDO::getRole, role);
+        return userMapper.selectList(wrapper);
+    }
+
+    /**
+     * 根据等级查询用户ID列表（用于动态分币）
+     * 等级通过推荐关系深度确定
+     */
+    public List<Long> findUserIdsByLevel(int level) {
+        // TODO: 实现根据推荐关系计算等级的逻辑
+        // 这里需要根据 UserRelationClosureDO 查询指定深度的用户
+        // 暂时返回空列表，需要配合业务逻辑实现
+        return Collections.emptyList();
+    }
+
 }

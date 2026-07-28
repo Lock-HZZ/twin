@@ -35,7 +35,7 @@ contract TIP is IERC20, Ownable {
     uint256 public BURN_INTERVAL = 1 days;
     uint256 public constant BASE = 1000;
     uint256 public lastBurnTime;
-    
+
     mapping(address => bool) public whiteList;
     
     constructor(address _burner) Ownable(msg.sender) {
@@ -128,7 +128,9 @@ contract TIP is IERC20, Ownable {
         require(msg.sender == burner, "Only burner can call this function");
 
         if (lastBurnTime != 0) {
-            require(block.timestamp >= lastBurnTime + BURN_INTERVAL, "Burn interval not reached");
+            uint256 lastBurnDay = lastBurnTime / BURN_INTERVAL;
+            uint256 currentDay = block.timestamp / BURN_INTERVAL;
+            require(currentDay > lastBurnDay, "Already burned today");
         }
 
         require(deadRatio <= BASE, "deadRatio exceeds BASE");

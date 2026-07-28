@@ -1,7 +1,10 @@
 package com.zmyc.service;
 
 import com.zmyc.common.context.UserContext;
+import com.zmyc.common.enums.AssetType;
 import com.zmyc.common.enums.ErrorCode;
+import com.zmyc.common.enums.RewardType;
+import com.zmyc.common.enums.TxStatus;
 import com.zmyc.common.exception.BusinessException;
 import com.zmyc.common.util.TimeUtils;
 import com.zmyc.domain.dto.RewardItem;
@@ -30,6 +33,7 @@ import java.util.Set;
 import java.util.stream.Collectors;
 
 import static com.zmyc.common.constant.SystemConfigKey.*;
+import static com.zmyc.common.enums.TxStatus.SUCCESS;
 
 @Service
 public class UserStakeService {
@@ -105,7 +109,6 @@ public class UserStakeService {
 
         stake.setStatus(UserStakeDO.Status.WITHDRAWN);
         stake.setTxHash(txHash);
-        stake.setUpdatedDate(System.currentTimeMillis() / 1000);
         stakeRepository.save(stake);
 
         log.info("记录赎回: stakeId={}, userId={}", stakeId, stake.getUserId());
@@ -292,8 +295,8 @@ public class UserStakeService {
             for (int i = 0; i < toSend.size(); i++) {
                 items.add(RewardItem.builder()
                         .userAddress(addresses.get(i))
-                        .rewardType(DividendContractService.RewardType.STAKE_DIVIDEND.code)
-                        .assetType(DividendContractService.AssetType.TIP.code)
+                        .rewardType(RewardType.STAKE_DIVIDEND.code)
+                        .assetType(AssetType.TIP.code)
                         .amount(toSend.get(i).getAmount())
                         .build());
             }
@@ -309,7 +312,7 @@ public class UserStakeService {
         dividendRepository.markBatchSent(batchId, txHash, System.currentTimeMillis() / 1000);
 
         // 等待确认并更新最终状态
-        DividendContractService.TxStatus status = dividendContractService.waitForConfirmation(txHash);
+        TxStatus status = dividendContractService.waitForConfirmation(txHash);
         switch (status) {
             case SUCCESS -> {
                 dividendRepository.markBatchPaid(batchId, txHash, System.currentTimeMillis() / 1000);
@@ -364,8 +367,8 @@ public class UserStakeService {
             for (int i = 0; i < toSend.size(); i++) {
                 items.add(RewardItem.builder()
                         .userAddress(addresses.get(i))
-                        .rewardType(DividendContractService.RewardType.STAKE_DIVIDEND.code)
-                        .assetType(DividendContractService.AssetType.TIP.code)
+                        .rewardType(RewardType.STAKE_DIVIDEND.code)
+                        .assetType(AssetType.TIP.code)
                         .amount(toSend.get(i).getAmount())
                         .build());
             }

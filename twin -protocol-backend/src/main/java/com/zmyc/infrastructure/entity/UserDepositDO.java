@@ -22,11 +22,11 @@ public class UserDepositDO extends BaseDO {
 
     private String txHash;
 
-    private Integer minerCount;
-
     private BigDecimal energyEarned;
 
     private BigDecimal energyMultiplier;
+
+    private BigDecimal liquidity;
 
     /** 权重（根据注册天数计算） */
     private BigDecimal weight;
@@ -40,10 +40,14 @@ public class UserDepositDO extends BaseDO {
     /** 过期时间（10位时间戳），PENDING 状态超过此时间自动变为 EXPIRED */
     private Long expiresAt;
 
+    /** 移除LP的交易哈希（REMOVING状态后填充，用于回执轮询） */
+    private String withdrawTxHash;
+
     public static class Status {
         public static final Integer PENDING = 0;
         public static final Integer COMPLETED = 1;
-        public static final Integer FAILED = 2;
-        public static final Integer EXPIRED = 3;  // 超时未完成
+        public static final Integer EXPIRED = 2;
+        public static final Integer REMOVING = 3;
+        public static final Integer REMOVED = 4;
     }
 }

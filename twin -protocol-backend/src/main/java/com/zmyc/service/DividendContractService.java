@@ -1,6 +1,8 @@
 package com.zmyc.service;
 
 import com.zmyc.common.config.DividendContractConfig;
+import com.zmyc.common.enums.AssetType;
+import com.zmyc.common.enums.TxStatus;
 import com.zmyc.contract.DividendContract;
 import com.zmyc.domain.dto.RewardItem;
 import jakarta.annotation.PostConstruct;
@@ -37,67 +39,6 @@ public class DividendContractService {
     private static final int MAX_RECEIPT_RETRIES = 40;
     private static final long RECEIPT_POLL_INTERVAL_MS = 3000L;
     private static final int REQUIRED_CONFIRMATIONS = 3;
-
-    // ------------------------------------------------------------------ //
-    //  类型枚举                                                            //
-    // ------------------------------------------------------------------ //
-
-    /**
-     * 链上奖励类型枚举，与 Dividend.sol rewardType 字段一一对应。
-     * 新增奖励类型只需在此处添加一行，业务代码无需修改。
-     */
-    public enum RewardType {
-        STAKE_DIVIDEND((byte) 1),
-        REFERRAL_REWARD((byte) 2),
-        LP_MINING((byte) 3);
-        // 示例：TASK_REWARD((byte) 4), ACTIVITY_REWARD((byte) 5)
-
-        public final byte code;
-
-        RewardType(byte code) {
-            this.code = code;
-        }
-
-        public static RewardType of(byte code) {
-            for (RewardType t : values()) {
-                if (t.code == code) return t;
-            }
-            throw new IllegalArgumentException("Unknown reward type: " + code);
-        }
-    }
-
-    /**
-     * 链上资产类型枚举，携带链上精度，用于 BigDecimal → wei 转换。
-     * USDC 为 6 位小数，TIP 为 18 位小数。
-     */
-    public enum AssetType {
-        USDC((byte) 0, BigInteger.TEN.pow(6)),
-        TIP((byte) 1, BigInteger.TEN.pow(18));
-
-        public final byte code;
-        public final BigInteger decimals;
-
-        AssetType(byte code, BigInteger decimals) {
-            this.code = code;
-            this.decimals = decimals;
-        }
-
-        public static AssetType of(byte code) {
-            for (AssetType t : values()) {
-                if (t.code == code) return t;
-            }
-            throw new IllegalArgumentException("Unknown asset type: " + code);
-        }
-    }
-
-    /**
-     * 交易最终状态
-     */
-    public enum TxStatus {
-        SUCCESS,
-        FAILED,
-        PENDING
-    }
 
     // ------------------------------------------------------------------ //
     //  初始化                                                              //
@@ -207,10 +148,6 @@ public class DividendContractService {
             return false;
         }
     }
-
-    // ------------------------------------------------------------------ //
-    //  交易确认                                                             //
-    // ------------------------------------------------------------------ //
 
     /**
      * 等待并确认交易最终状态（轮询 receipt，要求足够确认数以防 reorg）
