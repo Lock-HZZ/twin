@@ -20,4 +20,14 @@ public interface UserEnergyMapper extends BaseMapper<UserEnergyDO> {
     int addEnergy(@Param("userId") Long userId,
                   @Param("amount") BigDecimal amount,
                   @Param("now") Long now);
+
+    /** 原子扣减能量值（余额不足时不执行，返回受影响行数） */
+    @Update("UPDATE user_energy " +
+            "SET energy_balance = energy_balance - #{amount}, " +
+            "    total_consumed = total_consumed + #{amount}, " +
+            "    last_updated_date = #{now} " +
+            "WHERE user_id = #{userId} AND energy_balance >= #{amount}")
+    int deductEnergy(@Param("userId") Long userId,
+                     @Param("amount") BigDecimal amount,
+                     @Param("now") Long now);
 }

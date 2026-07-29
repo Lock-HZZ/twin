@@ -1,19 +1,23 @@
 package com.zmyc.common.enums;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.util.Objects;
+
 public enum Decimals {
 
-    USDC(6),
-    TIP(18);
+    USDC(new BigDecimal("10").pow(6)),
+    TIP(new BigDecimal("10").pow(18));
 
-    public final int value;
+    public final BigDecimal value;
 
-    Decimals(int value) {
+    Decimals(BigDecimal value) {
         this.value = value;
     }
 
-    public static Decimals of(int value) {
+    public static Decimals of(BigDecimal value) {
         for (Decimals t : values()) {
-            if (t.value == value) return t;
+            if (Objects.equals(t.value, value)) return t;
         }
         throw new IllegalArgumentException("Unknown decimals: " + value);
     }

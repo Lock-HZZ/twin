@@ -108,7 +108,7 @@ public class AkSkInterceptor implements HandlerInterceptor {
             }
             
             Boolean exists = redisTemplate.hasKey(NONCE_PREFIX + nonce);
-            if (exists) {
+            if (Boolean.TRUE.equals(exists)) {
                 log.error("Nonce已使用（重放攻击） - IP: {}, URI: {}, Nonce: {}",
                         getClientIp(request), request.getRequestURI(), nonce);
                 throw new BusinessException(ErrorCode.NONCE_REUSED);

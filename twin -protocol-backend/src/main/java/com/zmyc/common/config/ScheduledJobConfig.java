@@ -1,4 +1,4 @@
-package com.zmyc.config;
+package com.zmyc.common.config;
 
 import com.zmyc.job.QuartzJobService;
 import org.slf4j.Logger;
@@ -28,6 +28,7 @@ public class ScheduledJobConfig implements ApplicationRunner {
         initRemoveLiquidityConfirmJob();
         initDailyBurnJob();
         initBurnConfirmJob();
+        initFeeDistributionConfirmJob();
     }
 
     /**
@@ -170,8 +171,27 @@ public class ScheduledJobConfig implements ApplicationRunner {
             } else {
                 log.info("TIP燃烧补偿任务已存在，跳过注册");
             }
+    /**
+     * 初始化手续费分配确认补偿任务
+     * 每5分钟执行一次：确认SENT记录，重发PENDING记录
+     */
+    private void initFeeDistributionConfirmJob() {
+        try {
+            String jobName = "feeDistributionConfirmJob";
+            String jobGroup = "feeGroup";
+            String triggerName = "feeDistributionConfirmTrigger";
+            String triggerGroup = "feeGroup";
+            String jobClass = "FeeDistributionConfirmJob";
+            String cron = "0 */5 * * * ?";
+
+            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
+                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
+                log.info("手续费分配确认任务注册成功: cron={}", cron);
+            } else {
+                log.info("手续费分配确认任务已存在，跳过注册");
+            }
         } catch (Exception e) {
-            log.error("TIP燃烧补偿任务注册失败", e);
+            log.error("手续费分配确认任务注册失败", e);
         }
     }
 }

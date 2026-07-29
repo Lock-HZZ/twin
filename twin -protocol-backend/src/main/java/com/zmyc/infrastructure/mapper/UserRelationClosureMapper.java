@@ -32,4 +32,11 @@ public interface UserRelationClosureMapper extends BaseMapper<UserRelationClosur
             "WHERE descendant_id = #{userId} " +
             "ORDER BY depth ASC")
     List<Long> findAncestorIds(@Param("userId") Long userId);
+
+    /** 统计某用户的有效直推邀请数（直推子节点中至少有一笔COMPLETED入金的） */
+    @Select("SELECT COUNT(DISTINCT c.descendant_id) " +
+            "FROM user_relation_closure c " +
+            "INNER JOIN user_deposit d ON d.user_id = c.descendant_id AND d.status = 1 " +
+            "WHERE c.ancestor_id = #{userId} AND c.depth = 1")
+    int countValidDirectChildren(@Param("userId") Long userId);
 }

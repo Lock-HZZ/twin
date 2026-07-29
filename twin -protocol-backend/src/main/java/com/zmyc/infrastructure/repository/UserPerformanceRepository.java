@@ -56,4 +56,9 @@ public class UserPerformanceRepository {
                 .skip(1)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
     }
+
+    /** 查询用户业绩记录（用于获取communityVolumeUsdt等缓存字段） */
+    public UserPerformanceDO findByUserId(Long userId) {
+        return performanceMapper.selectById(userId);
+    }
 }

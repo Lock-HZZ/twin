@@ -48,8 +48,6 @@ public class WebConfig implements WebMvcConfigurer {
                 .addPathPatterns("/**")
                 .excludePathPatterns(
                         "/auth/**", // 认证相关接口
-                        "/announcement/info", // 公告查询接口
-                        "/deposit/batch", // 入金接口（使用AK/SK认证）
                         "/api/quartz/**", // 定时任务接口
                         "/swagger-ui/**", // Swagger UI
                         "/v3/api-docs/**", // Swagger API文档

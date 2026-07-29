@@ -116,7 +116,7 @@ public class UserDepositService {
 
         // 8. 生成 EIP-712 签名
         long deadline = System.currentTimeMillis() / 1000 + depositConfig.getSignatureTtlSeconds();
-        BigInteger amountWei = amount.toBigInteger().multiply(new BigInteger(Decimals.USDC.value + "")); // 转换为最小单位（USDC 6位小数）
+        BigInteger amountWei = amount.toBigInteger().multiply(Decimals.USDC.value.toBigInteger()); // 转换为最小单位（USDC 6位小数）
 
         String signature = Eip712DepositSigner.sign(
                 depositConfig.getSignerPrivateKey(),
@@ -317,13 +317,13 @@ public class UserDepositService {
         if (createdDate == null) {
             return 0;
         }
-        long now = System.currentTimeMillis() / 1000;
+        long now = TimeUtils.now();
         return Math.max(0, (now - createdDate) / (24 * 60 * 60));
     }
 
     @Transactional
     public int cancelExpiredOrders() {
-        long now = System.currentTimeMillis() / 1000;
+        long now = TimeUtils.now();
         int count = depositRepository.expirePendingOrders(now);
         if (count > 0) {
             log.info("入金订单过期清理：已取消 {} 个订单并释放额度", count);

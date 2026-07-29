@@ -19,7 +19,11 @@ contract FeeDividend is
 
     mapping(address => uint256) public balances;
 
+    /// @notice 已处理的批次ID，用于幂等去重
+    mapping(bytes32 => bool) public usedBatch;
+
     event RewardAdded(address indexed user, uint256 amount);
+    event BatchProcessed(bytes32 indexed batchId, uint256 count);
     event Withdraw(address indexed user, uint256 amount);
     event OperatorUpdated(address operator);
 
@@ -55,6 +59,34 @@ contract FeeDividend is
             balances[users[i]] += amounts[i];
             emit RewardAdded(users[i], amounts[i]);
         }
+    }
+
+    /**
+     * @notice 幂等批量发放。同一 batchId 只能成功执行一次。
+     */
+    function addRewardsBatch(
+        bytes32 batchId,
+        address[] calldata users,
+        uint256[] calldata amounts
+    ) external onlyOperator {
+        require(!usedBatch[batchId], "Batch already processed");
+        uint256 len = users.length;
+        require(len == amounts.length, "Length mismatch");
+        require(len > 0, "Empty batch");
+
+        usedBatch[batchId] = true;
+
+        for (uint256 i = 0; i < len; i++) {
+            require(amounts[i] > 0, "Zero amount");
+            balances[users[i]] += amounts[i];
+            emit RewardAdded(users[i], amounts[i]);
+        }
+
+        emit BatchProcessed(batchId, len);
+    }
+
+    function isBatchProcessed(bytes32 batchId) external view returns (bool) {
+        return usedBatch[batchId];
     }
 
     function withdraw(uint256 amount) external nonReentrant {

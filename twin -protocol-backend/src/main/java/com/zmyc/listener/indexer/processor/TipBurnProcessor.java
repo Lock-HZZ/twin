@@ -2,6 +2,7 @@ package com.zmyc.listener.indexer.processor;
 
 import com.zmyc.bamboo.core.model.EventLog;
 import com.zmyc.common.config.BurnConfig;
+import com.zmyc.common.enums.Decimals;
 import com.zmyc.infrastructure.entity.TipBurnRecordDO;
 import com.zmyc.infrastructure.repository.TipBurnRecordRepository;
 import com.zmyc.listener.indexer.TransactionInfo;
@@ -38,45 +39,40 @@ public class TipBurnProcessor implements EventProcessor<TipBurnModel> {
 
     @Override
     public Event getEvent() {
-        return new Event("Transfer", List.of(
-                new TypeReference<Address>(true) {},   // from (indexed)
-                new TypeReference<Address>(true) {},   // to   (indexed)
-                new TypeReference<Uint256>()      {}   // value
+        return new Event("burnPoolTokens", List.of(
+                new TypeReference<Uint256>() {},   // burnAmount
+                new TypeReference<Uint256>() {},   // toBurn
+                new TypeReference<Uint256>() {}    // toDividend
         ));
     }
 
     /**
-     * topics[0] = event sig hash
-     * topics[1] = from (pair address, 32-byte padded)
-     * topics[2] = to   (dividendAddress, 32-byte padded)
-     * data       = value (toDividendAmount in wei)
-     *
-     * 只处理 to == dividendContractAddress 的 Transfer（即燃烧分红转账）
-     * 其他 Transfer 返回 null，doBusinessLogic 跳过
+     * 解析燃烧分红事件，返回 TipBurnModel
      */
     @Override
     public TipBurnModel getModel(EventLog eventLog, TransactionInfo transactionInfo) {
-        String[] topics = eventLog.getTopics().split(",");
-        if (topics.length < 3) {
-            return null;
-        }
-
         List<Type> decoded = FunctionReturnDecoder.decode(
                 eventLog.getData(), getEvent().getNonIndexedParameters());
 
-        BigDecimal toDividendAmount = new BigDecimal(((Uint256) decoded.get(0)).getValue())
-                .divide(new BigDecimal("1000000000000000000"), 18, RoundingMode.DOWN);
+        BigDecimal burnAmount = new BigDecimal(((Uint256) decoded.get(0)).getValue())
+                .divide(Decimals.TIP.value, 18, RoundingMode.DOWN);
+
+        BigDecimal toDividendAmount = new BigDecimal(((Uint256) decoded.get(2)).getValue())
+                .divide(Decimals.TIP.value, 18, RoundingMode.DOWN);
 
         String txHash = transactionInfo.getTransaction().getHash();
-        log.info("检测到燃烧分红Transfer事件: txHash={}, toDividend={}", txHash, toDividendAmount);
+        log.info("检测到燃烧分红事件: txHash={}, toDividend={}", txHash, toDividendAmount);
 
-        return new TipBurnModel(toDividendAmount, txHash);
+        return new TipBurnModel(toDividendAmount, txHash, burnAmount);
     }
 
     @Override
     public void doBusinessLogic(Object obj) {
         TipBurnModel model = (TipBurnModel) obj;
         TipBurnRecordDO tipBurnRecordDO = burnRecordRepository.findByTxHash(model.getTxHash());
+        tipBurnRecordDO.setBurnAmount(model.getBurnAmount());
+        tipBurnRecordDO.setDividendAmount(model.getToDividendAmount());
+        burnRecordRepository.save(tipBurnRecordDO);
         rewardService.distributeBurnDividend(tipBurnRecordDO);
     }
 }

@@ -13,8 +13,8 @@ public enum ErrorCode {
     
     // ========== 认证相关错误 1000-1999 ==========
     AUTH_FAILED(1000, "error.auth.failed"),
-
     USER_NOT_EXISTS(1001, "error.user.not.exists"),
+    USER_IS_DISABLED(1002, "error.user.is.disabled"),
 
     TOKEN_NOT_FOUND(2001, "error.token.not.found"),
 
@@ -48,7 +48,11 @@ public enum ErrorCode {
     STAKE_ALREADY_WITHDRAWN(6003, "error.stake.already.withdrawn"),
     STAKE_NOT_MATURED(6004, "error.stake.not.matured"),
     NO_PERMISSION(6005, "error.no.permission"),
-    RECORD_NOT_FOUND(6006, "error.record.not.found");
+    RECORD_NOT_FOUND(6006, "error.record.not.found"),
+
+    SIGNATURE_INVALID(7001, "error.signature.invalid"),
+    NONCE_REUSED(7002, "error.nonce.reused"),
+    TIMESTAMP_INVALID(7003, "error.timestamp.invalid");
 
     private final int code;
     private final String messageKey;

@@ -21,9 +21,6 @@ public class LoginRequest {
     @NotBlank(message = "签名不能为空")
     private String signature;
 
-    @Schema(description = "邀请码" )
-    private String invitedCode;
-
     public String buildSignMessage() {
         return address + "|login by wallet|" + timestamp;
     }

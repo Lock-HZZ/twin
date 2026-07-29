@@ -1,8 +1,12 @@
 package com.zmyc.listener.indexer.processor;
 
 import com.zmyc.bamboo.core.model.EventLog;
+import com.zmyc.common.enums.Decimals;
+import com.zmyc.infrastructure.entity.UserDepositDO;
+import com.zmyc.infrastructure.repository.UserDepositRepository;
 import com.zmyc.listener.indexer.TransactionInfo;
 import com.zmyc.listener.indexer.model.DepositExecutedModel;
+import com.zmyc.service.RewardService;
 import com.zmyc.service.UserDepositService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +32,12 @@ public class DepositExecutedProcessor implements EventProcessor<DepositExecutedM
 
     @Autowired
     private UserDepositService depositService;
+
+    @Autowired
+    private UserDepositRepository depositRepository;
+
+    @Autowired
+    private RewardService rewardService;
 
     @Override
     public Event getEvent() {
@@ -67,20 +77,35 @@ public class DepositExecutedProcessor implements EventProcessor<DepositExecutedM
         BigInteger tipBought = ((Uint256) decodedValues.get(2)).getValue();
         BigInteger liquidity = ((Uint256) decodedValues.get(3)).getValue();
 
-        BigDecimal tipDecimal = new BigDecimal("1000000000000000000");
-        BigDecimal usdcDecimal = new BigDecimal("1000000");
-        BigDecimal usdcAmountDecimal= new BigDecimal(usdcAmount).divide(usdcDecimal, 8, RoundingMode.DOWN);
-        BigDecimal toDividendDecimal = new BigDecimal(toDividend).divide(usdcDecimal, 8, RoundingMode.DOWN);
-        BigDecimal tipBoughtDecimal = new BigDecimal(tipBought).divide(tipDecimal, 8, RoundingMode.DOWN);
-        BigDecimal liquidityDecimal = new BigDecimal(liquidity).divide(tipDecimal, 8, RoundingMode.DOWN);
+        BigDecimal usdcAmountDecimal= new BigDecimal(usdcAmount).divide(Decimals.USDC.value, 8, RoundingMode.DOWN);
+        BigDecimal toDividendDecimal = new BigDecimal(toDividend).divide(Decimals.USDC.value, 8, RoundingMode.DOWN);
+        BigDecimal tipBoughtDecimal = new BigDecimal(tipBought).divide(Decimals.TIP.value, 8, RoundingMode.DOWN);
+        BigDecimal liquidityDecimal = new BigDecimal(liquidity).divide(Decimals.TIP.value, 8, RoundingMode.DOWN);
         return new DepositExecutedModel(userAddress, nonce, usdcAmountDecimal, toDividendDecimal, tipBoughtDecimal, liquidityDecimal, hash);
     }
 
     @Override
     public void doBusinessLogic(Object model) {
         DepositExecutedModel depositExecutedModel = (DepositExecutedModel) model;
-        log.info("Processing DepositExecutedModel event: hash={}", depositExecutedModel.getTxHash());
-        depositService.processDeposit(depositExecutedModel.getNonce(), depositExecutedModel.getLiquidity(), depositExecutedModel.getUsdcAmount(), depositExecutedModel.getTxHash());
+        String txHash = depositExecutedModel.getTxHash();
+        log.info("Processing DepositExecutedModel event: hash={}", txHash);
+
+        depositService.processDeposit(depositExecutedModel.getNonce(),
+                depositExecutedModel.getLiquidity(), depositExecutedModel.getUsdcAmount(), txHash);
+
+        if (depositExecutedModel.getToDividend() == null ||
+                depositExecutedModel.getToDividend().compareTo(java.math.BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        UserDepositDO deposit = depositRepository.findByTxHash(txHash);
+        if (deposit == null) {
+            log.warn("入金分红跳过：找不到deposit记录, txHash={}", txHash);
+            return;
+        }
+
+        rewardService.distributeDepositDividend(depositExecutedModel.getUser(),
+                deposit.getUserId(), depositExecutedModel.getToDividend(), deposit.getId());
     }
 
 }

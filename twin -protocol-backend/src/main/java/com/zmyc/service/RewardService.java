@@ -7,8 +7,11 @@ import com.zmyc.infrastructure.entity.RewardRecordDO;
 import com.zmyc.infrastructure.entity.TipBurnRecordDO;
 import com.zmyc.infrastructure.entity.UserDO;
 import com.zmyc.infrastructure.entity.UserDepositDO;
+import com.zmyc.infrastructure.entity.UserPerformanceDO;
 import com.zmyc.infrastructure.repository.RewardRecordRepository;
 import com.zmyc.infrastructure.repository.UserDepositRepository;
+import com.zmyc.infrastructure.repository.UserPerformanceRepository;
+import com.zmyc.infrastructure.repository.UserRelationClosureRepository;
 import com.zmyc.infrastructure.repository.UserRepository;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -37,6 +40,15 @@ public class RewardService {
 
     @Autowired
     private UserDepositRepository userDepositRepository;
+
+    @Autowired
+    private UserPerformanceRepository performanceRepository;
+
+    @Autowired
+    private UserRelationClosureRepository closureRepository;
+
+    @Autowired
+    private UserRelationService userRelationService;
 
     private static final int DIVIDEND_BATCH_SIZE = 200;
 
@@ -145,7 +157,9 @@ public class RewardService {
                 RewardType.BURN_DEPOSIT_WEIGHTED.code,
                 RewardType.BURN_NODE_WEIGHTED.code,
                 RewardType.BURN_PARTNER_EQUAL.code,
-                RewardType.BURN_DYNAMIC_LEVEL.code);
+                RewardType.BURN_DYNAMIC_LEVEL.code,
+                RewardType.DEPOSIT_NODE_REWARD.code,
+                RewardType.DEPOSIT_MANAGEMENT_REWARD.code);
         if (sent.isEmpty()) return;
 
         log.info("补偿任务：发现 {} 条SENT状态燃烧分红记录", sent.size());
@@ -416,6 +430,164 @@ public class RewardService {
      */
     private String generateBatchId(TipBurnRecordDO record, int batchIndex) {
         String data = "BURN_DIVIDEND_" + record.getId() + "_" + record.getBurnDate() + "_" + batchIndex;
+        byte[] hash = org.web3j.crypto.Hash.sha3(data.getBytes());
+        return Numeric.toHexString(hash);
+    }
+
+    // ========== 入金分红 ==========
+
+    /**
+     * 入金分红：见点奖励(32%) + 管理奖励(42%)
+     * DAO/保险池/系统运营由合约直接处理，不在此分配
+     */
+    @Transactional
+    public void distributeDepositDividend(String userAddress, Long userId,
+                                          BigDecimal toDividend, Long depositId) {
+        log.info("开始分配入金分红: depositId={}, userId={}, toDividend={}", depositId, userId, toDividend);
+
+        // 幂等：以见点奖励类型作为代表判断是否已处理
+        if (!rewardRecordRepository.findByBusinessIdAndRewardType(
+                depositId, RewardType.DEPOSIT_NODE_REWARD.code).isEmpty()) {
+            log.warn("入金分红记录已存在，跳过重复分配: depositId={}", depositId);
+            return;
+        }
+
+        if (toDividend == null || toDividend.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("入金分红金额为0，跳过: depositId={}", depositId);
+            return;
+        }
+
+        long now = System.currentTimeMillis() / 1000;
+        int rewardDate = Integer.parseInt(new java.text.SimpleDateFormat("yyyyMMdd")
+                .format(new java.util.Date(now * 1000)));
+
+        List<Long> ancestors = closureRepository.findAncestorIds(userId);
+        List<RewardRecordDO> allRecords = new ArrayList<>();
+
+        // --- 1. 见点奖励 (32%，最多16层，每层2%) ---
+        BigDecimal perLayer = toDividend.multiply(new BigDecimal("0.02"));
+        int layerCount = 0;
+
+        for (Long ancestorId : ancestors) {
+            if (layerCount >= 16) break;
+
+            // 无效用户（无COMPLETED入金）自动跳过，不占层数
+            if (userDepositRepository.countActiveOrders(ancestorId) == 0) continue;
+
+            layerCount++;
+            int maxLayers = Math.min(closureRepository.countValidDirectChildren(ancestorId) * 2, 16);
+            if (layerCount <= maxLayers) {
+                BigDecimal rewardAmt = perLayer.setScale(6, RoundingMode.DOWN);
+                if (userRelationService.tryConsumeEnergy(ancestorId, rewardAmt, depositId,
+                        "消耗能量-见点奖励-L" + layerCount)) {
+                    continue;
+                }
+                allRecords.add(buildRewardRecord(depositId, rewardDate, ancestorId, rewardAmt,
+                        RewardType.DEPOSIT_NODE_REWARD.code, AssetType.USDC.code,
+                        "入金见点奖励-L" + layerCount, now));
+            }
+        }
+
+        // --- 2. 管理奖励 (42%，级差制度，S1-S7) ---
+        BigDecimal mgmtPool = toDividend.multiply(new BigDecimal("0.42"));
+        BigDecimal maxRateBelow = BigDecimal.ZERO;
+        BigDecimal totalMgmtDistributed = BigDecimal.ZERO;
+
+        for (Long ancestorId : ancestors) {
+            if (totalMgmtDistributed.compareTo(mgmtPool) >= 0) break;
+
+            // 无效用户不参与管理奖励
+            if (userDepositRepository.countActiveOrders(ancestorId) == 0) continue;
+
+            UserPerformanceDO perf = performanceRepository.findByUserId(ancestorId);
+            BigDecimal communityVol = (perf != null && perf.getCommunityVolumeUsdt() != null)
+                    ? perf.getCommunityVolumeUsdt() : BigDecimal.ZERO;
+
+            BigDecimal ownRate = getSLevelRate(communityVol);
+            if (ownRate.compareTo(maxRateBelow) > 0) {
+                BigDecimal differential = ownRate.subtract(maxRateBelow);
+                BigDecimal earn = toDividend.multiply(differential)
+                        .setScale(6, RoundingMode.DOWN);
+                BigDecimal remaining = mgmtPool.subtract(totalMgmtDistributed);
+                if (earn.compareTo(remaining) > 0) earn = remaining;
+
+                if (earn.compareTo(BigDecimal.ZERO) > 0) {
+                    if (userRelationService.tryConsumeEnergy(ancestorId, earn, depositId,
+                            "消耗能量-管理奖励-" + getSLevelName(communityVol))) {
+                        maxRateBelow = ownRate;
+                        continue;
+                    }
+                    allRecords.add(buildRewardRecord(depositId, rewardDate, ancestorId, earn,
+                            RewardType.DEPOSIT_MANAGEMENT_REWARD.code, AssetType.USDC.code,
+                            "入金管理奖励-" + getSLevelName(communityVol), now));
+                    totalMgmtDistributed = totalMgmtDistributed.add(earn);
+                }
+                maxRateBelow = ownRate;
+            }
+        }
+
+        if (allRecords.isEmpty()) {
+            log.warn("无有效分红对象，跳过入库和上链: depositId={}", depositId);
+            return;
+        }
+
+        // --- 3. 分批，分配 batchId，全量入库（PENDING） ---
+        List<List<RewardRecordDO>> batches = partition(allRecords);
+        for (int i = 0; i < batches.size(); i++) {
+            String batchId = generateDepositBatchId(depositId, i);
+            batches.get(i).forEach(r -> r.setBatchId(batchId));
+        }
+        rewardRecordRepository.saveBatch(allRecords);
+        log.info("入金分红共 {} 条记录入库完成，分 {} 批上链: depositId={}",
+                allRecords.size(), batches.size(), depositId);
+
+        // --- 4. 分批发送 ---
+        for (int i = 0; i < batches.size(); i++) {
+            sendDividendBatch(generateDepositBatchId(depositId, i), batches.get(i), depositId, i + 1, batches.size());
+        }
+    }
+
+    private RewardRecordDO buildRewardRecord(Long businessId, int rewardDate, Long userId,
+                                              BigDecimal amount, byte rewardType, byte assetType,
+                                              String remark, long now) {
+        RewardRecordDO r = new RewardRecordDO();
+        r.setUserId(userId);
+        r.setAmount(amount);
+        r.setRewardType(rewardType);
+        r.setAssetType(assetType);
+        r.setBusinessId(businessId);
+        r.setRewardDate(rewardDate);
+        r.setStatus(RewardRecordDO.Status.PENDING);
+        r.setRemark(remark);
+        r.setCreatedDate(now);
+        r.setUpdatedDate(now);
+        return r;
+    }
+
+    /** S级管理奖励比例（基于小区业绩） */
+    private BigDecimal getSLevelRate(BigDecimal communityVol) {
+        if (communityVol.compareTo(new BigDecimal("3000000")) >= 0) return new BigDecimal("0.42");
+        if (communityVol.compareTo(new BigDecimal("1500000")) >= 0) return new BigDecimal("0.36");
+        if (communityVol.compareTo(new BigDecimal("500000")) >= 0) return new BigDecimal("0.30");
+        if (communityVol.compareTo(new BigDecimal("150000")) >= 0) return new BigDecimal("0.24");
+        if (communityVol.compareTo(new BigDecimal("50000")) >= 0) return new BigDecimal("0.18");
+        if (communityVol.compareTo(new BigDecimal("15000")) >= 0) return new BigDecimal("0.12");
+        if (communityVol.compareTo(new BigDecimal("5000")) >= 0) return new BigDecimal("0.06");
+        return BigDecimal.ZERO;
+    }
+
+    private String getSLevelName(BigDecimal communityVol) {
+        if (communityVol.compareTo(new BigDecimal("3000000")) >= 0) return "S7";
+        if (communityVol.compareTo(new BigDecimal("1500000")) >= 0) return "S6";
+        if (communityVol.compareTo(new BigDecimal("500000")) >= 0) return "S5";
+        if (communityVol.compareTo(new BigDecimal("150000")) >= 0) return "S4";
+        if (communityVol.compareTo(new BigDecimal("50000")) >= 0) return "S3";
+        if (communityVol.compareTo(new BigDecimal("15000")) >= 0) return "S2";
+        return "S1";
+    }
+
+    private String generateDepositBatchId(Long depositId, int batchIndex) {
+        String data = "DEPOSIT_DIVIDEND_" + depositId + "_" + batchIndex;
         byte[] hash = org.web3j.crypto.Hash.sha3(data.getBytes());
         return Numeric.toHexString(hash);
     }

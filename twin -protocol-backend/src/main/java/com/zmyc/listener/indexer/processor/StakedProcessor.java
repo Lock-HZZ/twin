@@ -1,6 +1,7 @@
 package com.zmyc.listener.indexer.processor;
 
 import com.zmyc.bamboo.core.model.EventLog;
+import com.zmyc.common.enums.Decimals;
 import com.zmyc.listener.indexer.TransactionInfo;
 import com.zmyc.listener.indexer.model.StakedModel;
 import com.zmyc.infrastructure.repository.UserRepository;
@@ -58,9 +59,8 @@ public class StakedProcessor implements EventProcessor<StakedModel> {
                 getEvent().getNonIndexedParameters()
         );
 
-        BigDecimal tipDecimal = new BigDecimal("1000000000000000000");
         BigDecimal amount = new BigDecimal(((Uint256) decoded.get(0)).getValue())
-                .divide(tipDecimal, 8, RoundingMode.DOWN);
+                .divide(Decimals.TIP.value, 8, RoundingMode.DOWN);
         Integer plan = ((Uint256) decoded.get(1)).getValue().intValue();
         Long startTime = ((Uint256) decoded.get(2)).getValue().longValue();
         Long endTime = ((Uint256) decoded.get(3)).getValue().longValue();

@@ -14,4 +14,6 @@ public class TipBurnModel {
     private BigDecimal toDividendAmount;
     /** 触发燃烧的交易 Hash */
     private String txHash;
+
+    private BigDecimal burnAmount;
 }

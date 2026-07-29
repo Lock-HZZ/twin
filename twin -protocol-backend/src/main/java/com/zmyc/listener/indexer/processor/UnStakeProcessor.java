@@ -19,7 +19,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class WithdrawnProcessor implements EventProcessor<WithdrawnModel> {
+public class UnStakeProcessor implements EventProcessor<WithdrawnModel> {
 
     private final UserStakeService stakeService;
 

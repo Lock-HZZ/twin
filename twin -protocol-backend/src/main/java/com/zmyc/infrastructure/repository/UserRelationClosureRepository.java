@@ -42,6 +42,11 @@ public class UserRelationClosureRepository {
         return closureMapper.selectList(wrapper);
     }
 
+    /** 统计某用户的有效直推邀请数（有COMPLETED入金的直推子节点） */
+    public int countValidDirectChildren(Long userId) {
+        return closureMapper.countValidDirectChildren(userId);
+    }
+
     /** 统计某用户的团队总人数 */
     public long countDescendants(Long userId) {
         LambdaQueryWrapper<UserRelationClosureDO> wrapper = new LambdaQueryWrapper<>();

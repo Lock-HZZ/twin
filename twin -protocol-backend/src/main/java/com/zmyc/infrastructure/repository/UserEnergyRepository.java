@@ -20,6 +20,15 @@ public class UserEnergyRepository {
         energyMapper.addEnergy(userId, amount, now);
     }
 
+    /**
+     * 原子扣减能量值，余额不足返回 false
+     * 使用 WHERE energy_balance >= amount 防止超扣
+     */
+    public boolean deductEnergy(Long userId, BigDecimal amount) {
+        long now = System.currentTimeMillis() / 1000;
+        return energyMapper.deductEnergy(userId, amount, now) > 0;
+    }
+
     /** 查询用户能量值 */
     public UserEnergyDO findByUserId(Long userId) {
         LambdaQueryWrapper<UserEnergyDO> wrapper = new LambdaQueryWrapper<>();

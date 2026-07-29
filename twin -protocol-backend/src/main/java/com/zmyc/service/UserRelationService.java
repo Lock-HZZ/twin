@@ -7,14 +7,15 @@ import com.zmyc.infrastructure.repository.EnergyTransactionRepository;
 import com.zmyc.infrastructure.repository.UserEnergyRepository;
 import com.zmyc.infrastructure.repository.UserPerformanceRepository;
 import com.zmyc.infrastructure.repository.UserRelationClosureRepository;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
-import java.util.List;
 
 @Service
+@Slf4j
 public class UserRelationService {
 
     @Autowired
@@ -64,5 +65,37 @@ public class UserRelationService {
         transaction.setRelatedId(depositId);
         transaction.setRemark("入金获得能量值: " + amount + " USDT * " + multiplier);
         energyTransactionRepository.save(transaction);
+    }
+
+    /**
+     * 尝试消耗能量值（动态USDC奖励发放前调用）
+     * 原子扣减：余额不足时不扣减，返回 false，调用方应跳过发奖
+     *
+     * @param userId    接收奖励的用户
+     * @param amount    等值 USDC 的能量消耗量
+     * @param relatedId 关联业务ID（如 depositId）
+     * @param remark    流水备注
+     * @return true = 扣减成功，可以发奖；false = 余额不足，跳过发奖
+     */
+    public boolean tryConsumeEnergy(Long userId, BigDecimal amount, Long relatedId, String remark) {
+        UserEnergyDO before = energyRepository.findByUserId(userId);
+        BigDecimal balanceBefore = (before != null && before.getEnergyBalance() != null)
+                ? before.getEnergyBalance() : BigDecimal.ZERO;
+
+        if (!energyRepository.deductEnergy(userId, amount)) {
+            log.debug("能量值不足，跳过发奖: userId={}, required={}, balance={}", userId, amount, balanceBefore);
+            return false;
+        }
+
+        EnergyTransactionDO tx = new EnergyTransactionDO();
+        tx.setUserId(userId);
+        tx.setTransactionType(EnergyTransactionDO.TransactionType.CONSUME);
+        tx.setAmount(amount);
+        tx.setBalanceBefore(balanceBefore);
+        tx.setBalanceAfter(balanceBefore.subtract(amount));
+        tx.setRelatedId(relatedId);
+        tx.setRemark(remark);
+        energyTransactionRepository.save(tx);
+        return true;
     }
 }
