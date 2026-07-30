@@ -33,7 +33,7 @@ public class RewardRecordDO {
     /** 批次ID（32字节hex，链上幂等标识） */
     private String batchId;
 
-    /** 业务关联ID（如 stake_dividend_record.id、referral_record.id 等） */
+    /** 业务关联ID（如 user_stake.id、referral_record.id 等） */
     private Long businessId;
 
     /** 发放日期（yyyyMMdd格式，如 20260721） */

@@ -55,6 +55,9 @@ public class TradeContractService {
     @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
+    @Autowired
+    private UserLevelService userLevelService;
+
     private Credentials credentials;
 
     @PostConstruct
@@ -223,6 +226,9 @@ public class TradeContractService {
         deposit.setStatus(UserDepositDO.Status.REMOVED);
         deposit.setLiquidity(BigDecimal.ZERO);
         depositRepository.save(deposit);
+
+        // 移除LP后，该用户的推荐人链上可能失去一个有效直推，需更新等级
+        userLevelService.updateUserAndAncestorsLevel(deposit.getUserId());
 
         log.info("移除LP事件处理完成: depositId={}, usdcOut={}, tipToDividend={}, txHash={}",
                 deposit.getId(), usdcOut, tipToDividend, txHash);

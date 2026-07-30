@@ -1,7 +1,7 @@
 package com.zmyc.application.controller;
 
 import com.zmyc.application.vo.response.ApiResponse;
-import com.zmyc.infrastructure.entity.StakeDividendRecordDO;
+import com.zmyc.infrastructure.entity.RewardRecordDO;
 import com.zmyc.infrastructure.entity.UserStakeDO;
 import com.zmyc.service.UserStakeService;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -29,8 +29,8 @@ public class StakeController {
      * 查询用户分红记录
      */
     @GetMapping("/dividends")
-    public ApiResponse<List<StakeDividendRecordDO>> getUserDividends() {
-        List<StakeDividendRecordDO> dividends = stakeService.getCurrentUserDividends();
+    public ApiResponse<List<RewardRecordDO>> getUserDividends() {
+        List<RewardRecordDO> dividends = stakeService.getCurrentUserDividends();
         return ApiResponse.success(dividends);
     }
 }

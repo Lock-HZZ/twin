@@ -7,7 +7,7 @@ import lombok.NoArgsConstructor;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
-public class WithdrawnModel {
+public class UnStakeModel {
 
     private Long stakeId;
 

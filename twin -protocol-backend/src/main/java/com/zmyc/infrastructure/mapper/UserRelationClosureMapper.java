@@ -5,6 +5,7 @@ import com.zmyc.infrastructure.dto.AncestorLineDTO;
 import com.zmyc.infrastructure.entity.UserRelationClosureDO;
 import org.apache.ibatis.annotations.*;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 @Mapper
@@ -39,4 +40,23 @@ public interface UserRelationClosureMapper extends BaseMapper<UserRelationClosur
             "INNER JOIN user_deposit d ON d.user_id = c.descendant_id AND d.status = 1 " +
             "WHERE c.ancestor_id = #{userId} AND c.depth = 1")
     int countValidDirectChildren(@Param("userId") Long userId);
+
+    /** 统计某用户的所有直推数（不论是否有效） */
+    @Select("SELECT COUNT(*) FROM user_relation_closure " +
+            "WHERE ancestor_id = #{userId} AND depth = 1")
+    long countAllDirectChildren(@Param("userId") Long userId);
+
+    /** 统计团队有效用户数（所有层级下级中有COMPLETED入金的） */
+    @Select("SELECT COUNT(DISTINCT c.descendant_id) " +
+            "FROM user_relation_closure c " +
+            "INNER JOIN user_deposit d ON d.user_id = c.descendant_id AND d.status = 1 " +
+            "WHERE c.ancestor_id = #{userId}")
+    long countValidTeamMembers(@Param("userId") Long userId);
+
+    /** 统计直推用户的入金总额 */
+    @Select("SELECT COALESCE(SUM(d.amount), 0) " +
+            "FROM user_relation_closure c " +
+            "INNER JOIN user_deposit d ON d.user_id = c.descendant_id AND d.status = 1 " +
+            "WHERE c.ancestor_id = #{userId} AND c.depth = 1")
+    BigDecimal sumDirectDepositAmount(@Param("userId") Long userId);
 }

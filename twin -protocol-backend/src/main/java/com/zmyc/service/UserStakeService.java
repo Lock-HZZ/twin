@@ -8,8 +8,9 @@ import com.zmyc.common.enums.TxStatus;
 import com.zmyc.common.exception.BusinessException;
 import com.zmyc.common.util.TimeUtils;
 import com.zmyc.domain.dto.RewardItem;
-import com.zmyc.infrastructure.entity.StakeDividendRecordDO;
-import com.zmyc.infrastructure.entity.UserStakeDO;import com.zmyc.infrastructure.repository.StakeDividendRecordRepository;
+import com.zmyc.infrastructure.entity.RewardRecordDO;
+import com.zmyc.infrastructure.entity.UserStakeDO;
+import com.zmyc.infrastructure.repository.RewardRecordRepository;
 import com.zmyc.infrastructure.repository.SystemConfigRepository;
 import com.zmyc.infrastructure.repository.UserRepository;
 import com.zmyc.infrastructure.repository.UserStakeRepository;
@@ -44,7 +45,7 @@ public class UserStakeService {
     private UserStakeRepository stakeRepository;
 
     @Autowired
-    private StakeDividendRecordRepository dividendRepository;
+    private RewardRecordRepository rewardRecordRepository;
 
     @Autowired
     private SystemConfigRepository systemConfigRepository;
@@ -131,53 +132,12 @@ public class UserStakeService {
     /**
      * 主任务入口（每天一次）：计算今日分红 → 发送 PENDING 记录 → 标 SENT。
      * 职责边界：主任务负责初次发送，发完标 SENT 即可，不等确认、不做补偿。
+     * 补偿由 RewardConfirmJob 统一处理。
      */
     public void generateAndDistributeDailyDividends() {
         Long today = TimeUtils.getTodayZeroTimestamp();
         prepareTodayDividends(today);
         sendPendingDividends();
-    }
-
-    /**
-     * 补偿任务入口（高频）：只处理已有 txHash 的 SENT 记录，查链上补状态 + 重发失败的。
-     * 职责边界：
-     *   1. 查 txHash 链上状态 → 成功标 PAID，失败且批次未处理 → 重发（同 batchId 幂等）
-     *   2. 不碰无 txHash 的 PENDING 记录（那是主任务的事）
-     */
-    public void reconcileSentDividends() {
-        List<StakeDividendRecordDO> sent = dividendRepository.findByStatus(StakeDividendRecordDO.Status.SENT);
-        if (sent.isEmpty()) {
-            return;
-        }
-
-        Map<String, List<StakeDividendRecordDO>> grouped = sent.stream()
-                .collect(Collectors.groupingBy(StakeDividendRecordDO::getBatchId));
-
-        log.info("补偿：发现{}个待确认批次", grouped.size());
-        long now = System.currentTimeMillis() / 1000;
-
-        for (Map.Entry<String, List<StakeDividendRecordDO>> entry : grouped.entrySet()) {
-            String batchId = entry.getKey();
-            List<StakeDividendRecordDO> records = entry.getValue();
-            String txHash = records.getFirst().getTxHash();
-
-            // 以链上批次处理状态为准
-            if (dividendContractService.isBatchProcessed(batchId)) {
-                dividendRepository.markBatchPaid(batchId, null, now);
-                log.info("补偿：批次已确认成功，标记 PAID: batchId={}, count={}", batchId, records.size());
-                continue;
-            }
-
-            // 链上未处理：看这笔交易是否还存活
-            if (dividendContractService.isTransactionAlive(txHash)) {
-                // 交易仍在内存池 pending，继续等待，保持 SENT
-                log.debug("补偿：批次交易仍待确认，保持 SENT: batchId={}, txHash={}", batchId, txHash);
-            } else {
-                // 交易已失败/被丢弃，且链上批次确实未处理 → 重发（用同一 batchId，链上幂等）
-                log.warn("补偿：批次交易已失效且链上未处理，重新发送: batchId={}, oldTxHash={}", batchId, txHash);
-                resendBatch(batchId, records);
-            }
-        }
     }
 
     /**
@@ -191,16 +151,17 @@ public class UserStakeService {
             return;
         }
 
-        Set<Long> existing = dividendRepository.findExistingStakeIdsByDate(today);
+        Integer rewardDate = Integer.parseInt(LocalDate.now().format(DateTimeFormatter.ofPattern("yyyyMMdd")));
+        Set<Long> existingStakeIds = rewardRecordRepository.findExistingStakeIdsByDateAndType(rewardDate, RewardType.STAKE_DIVIDEND.code);
 
         long now = System.currentTimeMillis() / 1000;
         int batchSize = dividendContractConfig.getBatchSize();
         int shardIndex = 0;
         int inShard = 0;
-        List<StakeDividendRecordDO> toInsert = new ArrayList<>();
+        List<RewardRecordDO> toInsert = new ArrayList<>();
 
         for (UserStakeDO stake : activeStakes) {
-            if (existing.contains(stake.getId())) {
+            if (existingStakeIds.contains(stake.getId())) {
                 continue;
             }
 
@@ -209,15 +170,18 @@ public class UserStakeService {
                     .divide(BigDecimal.valueOf(100), 10, RoundingMode.HALF_UP)
                     .divide(BigDecimal.valueOf(365), 10, RoundingMode.HALF_UP);
 
-            StakeDividendRecordDO dividend = new StakeDividendRecordDO();
-            dividend.setStakeId(stake.getId());
-            dividend.setUserId(stake.getUserId());
-            dividend.setAmount(dailyAmount);
-            dividend.setDividendDate(today);
-            dividend.setBatchId(computeBatchId(today, shardIndex));
-            dividend.setStatus(StakeDividendRecordDO.Status.PENDING);
-            dividend.setCreatedDate(now);
-            toInsert.add(dividend);
+            RewardRecordDO reward = new RewardRecordDO();
+            reward.setUserId(stake.getUserId());
+            reward.setAmount(dailyAmount);
+            reward.setRewardType(RewardType.STAKE_DIVIDEND.code);
+            reward.setAssetType((byte) 1); // TIP
+            reward.setBatchId(computeBatchId(today, shardIndex));
+            reward.setBusinessId(stake.getId()); // 关联质押记录ID
+            reward.setRewardDate(rewardDate);
+            reward.setStatus(RewardRecordDO.Status.PENDING);
+            reward.setRemark("质押分红");
+            reward.setCreatedDate(now);
+            toInsert.add(reward);
 
             if (++inShard >= batchSize) {
                 shardIndex++;
@@ -230,7 +194,7 @@ public class UserStakeService {
             return;
         }
 
-        dividendRepository.insertBatch(toInsert);
+        rewardRecordRepository.insertBatch(toInsert);
         log.info("今日分红准备完成: date={}, 新建={}, 分片数={}", today, toInsert.size(), shardIndex + (inShard > 0 ? 1 : 0));
     }
 
@@ -238,17 +202,18 @@ public class UserStakeService {
      * 发送所有 PENDING 记录（仅主任务调用）。按 batchId 分组，逐批发送。
      */
     public void sendPendingDividends() {
-        List<StakeDividendRecordDO> pending = dividendRepository.findByStatus(StakeDividendRecordDO.Status.PENDING);
+        List<RewardRecordDO> pending = rewardRecordRepository.findByStatusAndRewardType(
+                RewardRecordDO.Status.PENDING.getValue(), RewardType.STAKE_DIVIDEND.code);
         if (pending.isEmpty()) {
             log.info("无待发放分红");
             return;
         }
 
-        Map<String, List<StakeDividendRecordDO>> grouped = pending.stream()
+        Map<String, List<RewardRecordDO>> grouped = pending.stream()
                 .filter(r -> r.getBatchId() != null && !r.getBatchId().isEmpty())
-                .collect(Collectors.groupingBy(StakeDividendRecordDO::getBatchId));
+                .collect(Collectors.groupingBy(RewardRecordDO::getBatchId));
 
-        for (Map.Entry<String, List<StakeDividendRecordDO>> entry : grouped.entrySet()) {
+        for (Map.Entry<String, List<RewardRecordDO>> entry : grouped.entrySet()) {
             sendBatch(entry.getKey(), entry.getValue());
         }
     }
@@ -257,24 +222,24 @@ public class UserStakeService {
      * 发送单个批次：发交易 → 保证 txHash 落库(SENT) → 等确认标 PAID。
      * 仅由主任务调用，处理首次发送 PENDING 记录。
      */
-    private void sendBatch(String batchId, List<StakeDividendRecordDO> records) {
+    private void sendBatch(String batchId, List<RewardRecordDO> records) {
         long now = System.currentTimeMillis() / 1000;
 
         // 幂等保护：若链上已处理该批次，直接标成功，不再发送
         if (dividendContractService.isBatchProcessed(batchId)) {
-            dividendRepository.markBatchPaid(batchId, null, now);
+            rewardRecordRepository.markBatchPaid(batchId, null, now);
             log.info("批次已在链上处理，批量标记成功: batchId={}", batchId);
             return;
         }
 
         // 批量查询用户地址（一次查询）
-        Set<Long> userIds = records.stream().map(StakeDividendRecordDO::getUserId).collect(Collectors.toSet());
+        Set<Long> userIds = records.stream().map(RewardRecordDO::getUserId).collect(Collectors.toSet());
         Map<Long, String> addressMap = userRepository.findAddressesByUserIds(userIds);
 
         // 收集有效记录（地址存在的）
-        List<StakeDividendRecordDO> toSend = new ArrayList<>();
+        List<RewardRecordDO> toSend = new ArrayList<>();
         List<String> addresses = new ArrayList<>();
-        for (StakeDividendRecordDO record : records) {
+        for (RewardRecordDO record : records) {
             String address = addressMap.get(record.getUserId());
             if (address == null || address.isEmpty()) {
                 log.error("用户地址为空，跳过分红: id={}, userId={}", record.getId(), record.getUserId());
@@ -309,13 +274,13 @@ public class UserStakeService {
 
         // 关键：拿到 txHash 后第一时间落库（SENT），保证"发出的交易一定有 hash"。
         // 此后即使进程崩溃，记录也已是 SENT+txHash，补偿任务能接手确认。
-        dividendRepository.markBatchSent(batchId, txHash, System.currentTimeMillis() / 1000);
+        rewardRecordRepository.markBatchSent(batchId, txHash, System.currentTimeMillis() / 1000);
 
         // 等待确认并更新最终状态
         TxStatus status = dividendContractService.waitForConfirmation(txHash);
         switch (status) {
             case SUCCESS -> {
-                dividendRepository.markBatchPaid(batchId, txHash, System.currentTimeMillis() / 1000);
+                rewardRecordRepository.markBatchPaid(batchId, txHash, System.currentTimeMillis() / 1000);
                 log.info("批次分红发放成功: batchId={}, count={}, txHash={}", batchId, toSend.size(), txHash);
             }
             case FAILED -> log.error("批次交易链上失败(revert)，保持 SENT 交补偿任务复查: batchId={}, txHash={}",
@@ -329,24 +294,24 @@ public class UserStakeService {
      * 重发批次（补偿任务专用）：已有 txHash 但交易失效，重新发送并覆盖 txHash。
      * 因为记录已经是 SENT，所以直接覆盖 txHash，不需要改状态。
      */
-    private void resendBatch(String batchId, List<StakeDividendRecordDO> records) {
+    private void resendBatch(String batchId, List<RewardRecordDO> records) {
         long now = System.currentTimeMillis() / 1000;
 
         // 二次确认链上未处理（防止并发）
         if (dividendContractService.isBatchProcessed(batchId)) {
-            dividendRepository.markBatchPaid(batchId, null, now);
+            rewardRecordRepository.markBatchPaid(batchId, null, now);
             log.info("补偿重发前发现批次已在链上处理: batchId={}", batchId);
             return;
         }
 
         // 批量查询用户地址（一次查询）
-        Set<Long> userIds = records.stream().map(StakeDividendRecordDO::getUserId).collect(Collectors.toSet());
+        Set<Long> userIds = records.stream().map(RewardRecordDO::getUserId).collect(Collectors.toSet());
         Map<Long, String> addressMap = userRepository.findAddressesByUserIds(userIds);
 
         // 收集有效记录
-        List<StakeDividendRecordDO> toSend = new ArrayList<>();
+        List<RewardRecordDO> toSend = new ArrayList<>();
         List<String> addresses = new ArrayList<>();
-        for (StakeDividendRecordDO record : records) {
+        for (RewardRecordDO record : records) {
             String address = addressMap.get(record.getUserId());
             if (address == null || address.isEmpty()) {
                 log.error("补偿重发：用户地址为空，跳过: id={}, userId={}", record.getId(), record.getUserId());
@@ -379,7 +344,7 @@ public class UserStakeService {
         }
 
         // 覆盖旧的 txHash（记录本来就是 SENT，只是换新 hash）
-        dividendRepository.markBatchSent(batchId, newTxHash, now);
+        rewardRecordRepository.markBatchSent(batchId, newTxHash, now);
         log.info("补偿重发成功，更新 txHash: batchId={}, oldTxHash={}, newTxHash={}",
                 batchId, records.get(0).getTxHash(), newTxHash);
 
@@ -424,9 +389,9 @@ public class UserStakeService {
     /**
      * 获取当前用户的分红记录
      */
-    public List<StakeDividendRecordDO> getCurrentUserDividends() {
+    public List<RewardRecordDO> getCurrentUserDividends() {
         Long userId = UserContext.getCurrentUserId();
-        return dividendRepository.findByUserId(userId);
+        return rewardRecordRepository.findByUserIdAndRewardType(userId, RewardType.STAKE_DIVIDEND.code);
     }
 
 }

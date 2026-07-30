@@ -2,7 +2,7 @@ package com.zmyc.listener.indexer.processor;
 
 import com.zmyc.bamboo.core.model.EventLog;
 import com.zmyc.listener.indexer.TransactionInfo;
-import com.zmyc.listener.indexer.model.WithdrawnModel;
+import com.zmyc.listener.indexer.model.UnStakeModel;
 import com.zmyc.service.UserStakeService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -19,7 +19,7 @@ import java.util.List;
 @Component
 @RequiredArgsConstructor
 @Slf4j
-public class UnStakeProcessor implements EventProcessor<WithdrawnModel> {
+public class UnStakeProcessor implements EventProcessor<UnStakeModel> {
 
     private final UserStakeService stakeService;
 
@@ -35,7 +35,7 @@ public class UnStakeProcessor implements EventProcessor<WithdrawnModel> {
     }
 
     @Override
-    public WithdrawnModel getModel(EventLog eventLog, TransactionInfo transactionInfo) {
+    public UnStakeModel getModel(EventLog eventLog, TransactionInfo transactionInfo) {
         Transaction transaction = transactionInfo.getTransaction();
         String hash = transaction.getHash();
 
@@ -43,12 +43,12 @@ public class UnStakeProcessor implements EventProcessor<WithdrawnModel> {
         Long stakeId = new BigInteger(topics[1].substring(2), 16).longValue();
         String userAddress = "0x" + topics[2].substring(26);
 
-        return new WithdrawnModel(stakeId, userAddress, hash);
+        return new UnStakeModel(stakeId, userAddress, hash);
     }
 
     @Override
     public void doBusinessLogic(Object model) {
-        WithdrawnModel m = (WithdrawnModel) model;
+        UnStakeModel m = (UnStakeModel) model;
         log.info("Processing Withdrawn event: stakeId={}, user={}, hash={}", m.getStakeId(), m.getUser(), m.getTxHash());
         stakeService.recordWithdrawFromChain(m.getStakeId(), m.getTxHash());
     }

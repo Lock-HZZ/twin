@@ -9,7 +9,7 @@ import java.math.BigDecimal;
 @Builder
 public class AssetRecordResponse {
 
-    /** 记录来源类型：ENERGY_EARN / ENERGY_CONSUME / USDC_REWARD / USDC_DEPOSIT / TIP_STAKE / TIP_STAKE_DIVIDEND */
+    /** 记录来源类型：ENERGY_EARN / ENERGY_CONSUME / USDC_REWARD / USDC_DEPOSIT / TIP_STAKE / TIP_REWARD */
     private String category;
 
     /** 资产类型：ENERGY / USDC / TIP */

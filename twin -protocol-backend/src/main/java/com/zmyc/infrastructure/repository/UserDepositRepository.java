@@ -135,10 +135,13 @@ public class UserDepositRepository {
         return depositMapper.selectList(wrapper);
     }
 
-    /** 根据提现交易哈希查询订单 */
-    public UserDepositDO findByWithdrawTxHash(String withdrawTxHash) {
-        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
-        wrapper.eq(UserDepositDO::getWithdrawTxHash, withdrawTxHash);
-        return depositMapper.selectOne(wrapper);
+    /** 统计团队（所有层级下级）的入金总额（USDC，仅COMPLETED状态） */
+    public java.math.BigDecimal sumTeamDepositAmount(Long userId) {
+        return depositMapper.sumTeamDepositAmount(userId);
+    }
+
+    /** 判断用户是否有效（有至少一笔COMPLETED入金） */
+    public boolean isValidUser(Long userId) {
+        return depositMapper.countCompletedDeposits(userId) > 0;
     }
 }

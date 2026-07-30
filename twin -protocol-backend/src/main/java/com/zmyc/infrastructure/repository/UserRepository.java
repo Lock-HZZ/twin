@@ -65,6 +65,13 @@ public class UserRepository {
     }
 
     /**
+     * 更新用户
+     */
+    public void update(UserDO user) {
+        userMapper.updateById(user);
+    }
+
+    /**
      * 批量查询用户地址（用于分红发放时收集地址，避免 N 次单条查询）
      * @return Map<userId, address>，不存在的 userId 会被过滤
      */
@@ -104,13 +111,25 @@ public class UserRepository {
 
     /**
      * 根据等级查询用户ID列表（用于动态分币）
-     * 等级通过推荐关系深度确定
+     * 直接查询 user.level 字段，等级由 UserLevelService 在入金/移除LP时维护
      */
     public List<Long> findUserIdsByLevel(int level) {
-        // TODO: 实现根据推荐关系计算等级的逻辑
-        // 这里需要根据 UserRelationClosureDO 查询指定深度的用户
-        // 暂时返回空列表，需要配合业务逻辑实现
-        return Collections.emptyList();
+        LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDO::getLevel, level)
+               .select(UserDO::getId);
+        return userMapper.selectList(wrapper).stream()
+                .map(UserDO::getId)
+                .collect(Collectors.toList());
     }
 
+    public Long findUserIdByAddress(String userAddress) {
+        LambdaQueryWrapper<UserDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDO::getAddress, userAddress)
+               .select(UserDO::getId);
+        UserDO user = userMapper.selectOne(wrapper);
+        if (user == null) {
+            throw new BusinessException(ErrorCode.USER_NOT_EXISTS);
+        }
+        return user.getId();
+    }
 }

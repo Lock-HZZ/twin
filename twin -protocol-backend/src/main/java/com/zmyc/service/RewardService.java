@@ -111,7 +111,7 @@ public class RewardService {
             String batchId = generateBatchId(record, i);
             batches.get(i).forEach(r -> r.setBatchId(batchId));
         }
-        rewardRecordRepository.saveBatch(allRecords);
+        rewardRecordRepository.insertBatch(allRecords);
         log.info("燃烧分红共 {} 条记录入库完成，分 {} 批上链: recordId={}",
                 allRecords.size(), batches.size(), record.getId());
 
@@ -154,6 +154,8 @@ public class RewardService {
      */
     public void reconcileDividends() {
         List<RewardRecordDO> sent = rewardRecordRepository.findSentByRewardTypes(
+                RewardType.STAKE_DIVIDEND.code,
+                RewardType.LP_MINING.code,
                 RewardType.BURN_DEPOSIT_WEIGHTED.code,
                 RewardType.BURN_NODE_WEIGHTED.code,
                 RewardType.BURN_PARTNER_EQUAL.code,
@@ -262,49 +264,45 @@ public class RewardService {
 
     /**
      * 计算入金加权分红（60%）
-     * 根据用户入金金额和权重加权分配
+     * 直接使用入金时预计算的 weighted_amount，避免实时计算
      */
     private List<RewardItem> calculateDepositWeightedDividend(BigDecimal totalAmount) {
-        // 查询所有已完成的入金记录
         List<UserDepositDO> deposits = userDepositRepository.findByStatus(UserDepositDO.Status.COMPLETED);
         if (deposits.isEmpty()) {
             return Collections.emptyList();
         }
 
-        // 计算总权重 = sum(amount * weight)
+        // 总加权金额 = sum(weighted_amount)
         BigDecimal totalWeightedAmount = deposits.stream()
-                .map(d -> d.getAmount().multiply(d.getWeight() != null ? d.getWeight() : BigDecimal.ONE))
+                .map(d -> d.getWeightedAmount() != null ? d.getWeightedAmount()
+                        : d.getAmount().multiply(d.getWeight() != null ? d.getWeight() : BigDecimal.ONE))
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
 
         if (totalWeightedAmount.compareTo(BigDecimal.ZERO) == 0) {
             return Collections.emptyList();
         }
 
-        // 按userId分组计算每个用户的加权金额
+        // 按userId聚合加权金额（一个用户可能有多笔入金）
         Map<Long, BigDecimal> userWeightedAmounts = deposits.stream()
                 .collect(Collectors.groupingBy(
                         UserDepositDO::getUserId,
                         Collectors.mapping(
-                                d -> d.getAmount().multiply(d.getWeight() != null ? d.getWeight() : BigDecimal.ONE),
+                                d -> d.getWeightedAmount() != null ? d.getWeightedAmount()
+                                        : d.getAmount().multiply(d.getWeight() != null ? d.getWeight() : BigDecimal.ONE),
                                 Collectors.reducing(BigDecimal.ZERO, BigDecimal::add)
                         )
                 ));
 
-        // 获取用户地址
         Map<Long, String> userAddresses = userRepository.findAddressesByUserIds(userWeightedAmounts.keySet());
 
-        // 生成分红列表
         return userWeightedAmounts.entrySet().stream()
                 .filter(e -> userAddresses.containsKey(e.getKey()))
                 .map(entry -> {
-                    Long userId = entry.getKey();
-                    BigDecimal weightedAmount = entry.getValue();
-                    BigDecimal dividend = totalAmount.multiply(weightedAmount)
+                    BigDecimal dividend = totalAmount.multiply(entry.getValue())
                             .divide(totalWeightedAmount, 18, RoundingMode.DOWN);
-
                     return RewardItem.builder()
-                            .userId(userId)
-                            .userAddress(userAddresses.get(userId))
+                            .userId(entry.getKey())
+                            .userAddress(userAddresses.get(entry.getKey()))
                             .amount(dividend)
                             .assetType(AssetType.TIP.code)
                             .remark("入金加权分红")
@@ -537,7 +535,7 @@ public class RewardService {
             String batchId = generateDepositBatchId(depositId, i);
             batches.get(i).forEach(r -> r.setBatchId(batchId));
         }
-        rewardRecordRepository.saveBatch(allRecords);
+        rewardRecordRepository.insertBatch(allRecords);
         log.info("入金分红共 {} 条记录入库完成，分 {} 批上链: depositId={}",
                 allRecords.size(), batches.size(), depositId);
 
@@ -576,7 +574,7 @@ public class RewardService {
         return BigDecimal.ZERO;
     }
 
-    private String getSLevelName(BigDecimal communityVol) {
+    public String getSLevelName(BigDecimal communityVol) {
         if (communityVol.compareTo(new BigDecimal("3000000")) >= 0) return "S7";
         if (communityVol.compareTo(new BigDecimal("1500000")) >= 0) return "S6";
         if (communityVol.compareTo(new BigDecimal("500000")) >= 0) return "S5";

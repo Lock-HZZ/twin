@@ -17,7 +17,7 @@ import java.util.List;
  *   USDC_REWARD      USDC奖励（见点/管理奖励等）
  *   USDC_DEPOSIT     USDC入金
  *   TIP_STAKE        TIP质押（正=质押，负=赎回）
- *   TIP_STAKE_DIVIDEND TIP质押分红
+ *   TIP_REWARD       TIP奖励（包含质押分红、推荐奖励等）
  */
 @Mapper
 public interface AssetRecordMapper {
@@ -77,19 +77,6 @@ public interface AssetRecordMapper {
             "FROM user_stake us " +
             "WHERE us.user_id = #{userId}";
 
-    String TIP_DIVIDEND_SQL =
-            "SELECT " +
-            "  'TIP_STAKE_DIVIDEND' AS category, " +
-            "  'TIP' AS asset_type, " +
-            "  sdr.amount, " +
-            "  NULL AS balance_before, " +
-            "  NULL AS balance_after, " +
-            "  '质押分红' AS remark, " +
-            "  sdr.id AS related_id, " +
-            "  sdr.created_date " +
-            "FROM stake_dividend_record sdr " +
-            "WHERE sdr.user_id = #{userId} AND sdr.status IN (1, 2)";
-
     String TIP_REWARD_SQL =
             "SELECT " +
             "  'TIP_REWARD' AS category, " +
@@ -107,7 +94,7 @@ public interface AssetRecordMapper {
             "SELECT * FROM (" +
             "  <if test=\"assetType == null or assetType == 'ENERGY'\">" + ENERGY_SQL + " UNION ALL " + "</if>" +
             "  <if test=\"assetType == null or assetType == 'USDC'\">" + USDC_REWARD_SQL + " UNION ALL " + USDC_DEPOSIT_SQL + " UNION ALL " + "</if>" +
-            "  <if test=\"assetType == null or assetType == 'TIP'\">" + TIP_STAKE_SQL + " UNION ALL " + TIP_DIVIDEND_SQL + " UNION ALL " + TIP_REWARD_SQL + " UNION ALL " + "</if>" +
+            "  <if test=\"assetType == null or assetType == 'TIP'\">" + TIP_STAKE_SQL + " UNION ALL " + TIP_REWARD_SQL + " UNION ALL " + "</if>" +
             "  SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL WHERE 1=0" +
             ") t " +
             "WHERE t.category IS NOT NULL " +
@@ -123,7 +110,7 @@ public interface AssetRecordMapper {
             "SELECT COUNT(*) FROM (" +
             "  <if test=\"assetType == null or assetType == 'ENERGY'\">" + ENERGY_SQL + " UNION ALL " + "</if>" +
             "  <if test=\"assetType == null or assetType == 'USDC'\">" + USDC_REWARD_SQL + " UNION ALL " + USDC_DEPOSIT_SQL + " UNION ALL " + "</if>" +
-            "  <if test=\"assetType == null or assetType == 'TIP'\">" + TIP_STAKE_SQL + " UNION ALL " + TIP_DIVIDEND_SQL + " UNION ALL " + TIP_REWARD_SQL + " UNION ALL " + "</if>" +
+            "  <if test=\"assetType == null or assetType == 'TIP'\">" + TIP_STAKE_SQL + " UNION ALL " + TIP_REWARD_SQL + " UNION ALL " + "</if>" +
             "  SELECT NULL, NULL, NULL, NULL, NULL, NULL, NULL, NULL WHERE 1=0" +
             ") t " +
             "WHERE t.category IS NOT NULL" +

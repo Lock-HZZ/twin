@@ -24,11 +24,11 @@ public class ScheduledJobConfig implements ApplicationRunner {
     public void run(ApplicationArguments args) throws Exception {
         initDepositExpirationJob();
         initStakeDividendJob();
-        initStakeDividendReconcileJob();
         initRemoveLiquidityConfirmJob();
         initDailyBurnJob();
         initBurnConfirmJob();
         initFeeDistributionConfirmJob();
+        initLpRewardReleaseJob();
     }
 
     /**
@@ -77,30 +77,6 @@ public class ScheduledJobConfig implements ApplicationRunner {
             }
         } catch (Exception e) {
             log.error("质押分红发放任务注册失败", e);
-        }
-    }
-
-    /**
-     * 初始化质押分红补偿任务
-     * 每5分钟执行一次：复查未确认（SENT/PENDING）的分红记录，兜底超时未确认的交易
-     */
-    private void initStakeDividendReconcileJob() {
-        try {
-            String jobName = "stakeDividendReconcileJob";
-            String jobGroup = "stakeGroup";
-            String triggerName = "stakeDividendReconcileTrigger";
-            String triggerGroup = "stakeGroup";
-            String jobClass = "StakeDividendReconcileJob";
-            String cron = "0 */5 * * * ?"; // 每5分钟执行一次
-
-            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
-                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
-                log.info("质押分红补偿任务注册成功: cron={}", cron);
-            } else {
-                log.info("质押分红补偿任务已存在，跳过注册");
-            }
-        } catch (Exception e) {
-            log.error("质押分红补偿任务注册失败", e);
         }
     }
 
@@ -171,6 +147,11 @@ public class ScheduledJobConfig implements ApplicationRunner {
             } else {
                 log.info("TIP燃烧补偿任务已存在，跳过注册");
             }
+        } catch (Exception e) {
+            log.error("TIP燃烧补偿任务注册失败", e);
+        }
+    }
+
     /**
      * 初始化手续费分配确认补偿任务
      * 每5分钟执行一次：确认SENT记录，重发PENDING记录
@@ -192,6 +173,30 @@ public class ScheduledJobConfig implements ApplicationRunner {
             }
         } catch (Exception e) {
             log.error("手续费分配确认任务注册失败", e);
+        }
+    }
+
+    /**
+     * 初始化LP挖矿奖励释放任务
+     * 每天凌晨2点执行：释放当日应发的LP奖励
+     */
+    private void initLpRewardReleaseJob() {
+        try {
+            String jobName = "lpRewardReleaseJob";
+            String jobGroup = "rewardGroup";
+            String triggerName = "lpRewardReleaseTrigger";
+            String triggerGroup = "rewardGroup";
+            String jobClass = "LpRewardReleaseJob";
+            String cron = "0 0 2 * * ?"; // 每天凌晨2点
+
+            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
+                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
+                log.info("LP挖矿奖励释放任务注册成功: cron={}", cron);
+            } else {
+                log.info("LP挖矿奖励释放任务已存在，跳过注册");
+            }
+        } catch (Exception e) {
+            log.error("LP挖矿奖励释放任务注册失败", e);
         }
     }
 }

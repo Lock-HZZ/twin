@@ -31,6 +31,9 @@ public class UserDepositDO extends BaseDO {
     /** 权重（根据注册天数计算） */
     private BigDecimal weight;
 
+    /** 加权金额 = amount * weight（入金时预计算，供分佣直接使用） */
+    private BigDecimal weightedAmount;
+
     /** 状态：0-待处理，1-已完成，2-失败 */
     private Integer status;
 

@@ -59,6 +59,9 @@ public class UserDepositService {
     private UserRelationService userRelationService;
 
     @Autowired
+    private UserLevelService userLevelService;
+
+    @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     @Value("${system.start.timestamp}")
@@ -109,6 +112,7 @@ public class UserDepositService {
         deposit.setUserId(userId);
         deposit.setAmount(amount);
         deposit.setWeight(weight);
+        deposit.setWeightedAmount(amount.multiply(weight));
         deposit.setStatus(UserDepositDO.Status.PENDING);
         deposit.setNonce(nonce.longValueExact());
         deposit.setExpiresAt(System.currentTimeMillis() / 1000 + depositConfig.getOrderExpirationSeconds());
@@ -182,6 +186,9 @@ public class UserDepositService {
 
         // 触发业绩统计和能量值增加
         userRelationService.onDeposit(deposit.getUserId(), amount, deposit.getId());
+
+        // 更新用户及其祖先的动态分币等级
+        userLevelService.updateUserAndAncestorsLevel(deposit.getUserId());
 
         log.info("入金处理完成: userId={}, txHash={}, nonce={}", deposit.getUserId(), txHash, nonce);
     }

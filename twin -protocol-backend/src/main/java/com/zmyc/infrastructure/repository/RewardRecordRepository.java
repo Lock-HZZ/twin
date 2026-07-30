@@ -7,6 +7,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Repository
 public class RewardRecordRepository {
@@ -15,7 +17,7 @@ public class RewardRecordRepository {
     private RewardRecordMapper mapper;
 
     /** 批量插入奖励记录 */
-    public void saveBatch(List<RewardRecordDO> records) {
+    public void insertBatch(List<RewardRecordDO> records) {
         if (records == null || records.isEmpty()) return;
         mapper.insertBatch(records);
     }
@@ -26,6 +28,34 @@ public class RewardRecordRepository {
         wrapper.eq(RewardRecordDO::getBusinessId, businessId)
                .eq(RewardRecordDO::getRewardType, rewardType);
         return mapper.selectList(wrapper);
+    }
+
+    /** 根据用户ID和奖励类型查询 */
+    public List<RewardRecordDO> findByUserIdAndRewardType(Long userId, byte rewardType) {
+        LambdaQueryWrapper<RewardRecordDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(RewardRecordDO::getUserId, userId)
+               .eq(RewardRecordDO::getRewardType, rewardType)
+               .orderByDesc(RewardRecordDO::getCreatedDate);
+        return mapper.selectList(wrapper);
+    }
+
+    /** 根据状态和奖励类型查询 */
+    public List<RewardRecordDO> findByStatusAndRewardType(int status, byte rewardType) {
+        LambdaQueryWrapper<RewardRecordDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(RewardRecordDO::getStatus, status)
+               .eq(RewardRecordDO::getRewardType, rewardType);
+        return mapper.selectList(wrapper);
+    }
+
+    /** 查询指定日期和奖励类型下已存在的质押记录ID集合（用于幂等） */
+    public Set<Long> findExistingStakeIdsByDateAndType(Integer rewardDate, byte rewardType) {
+        LambdaQueryWrapper<RewardRecordDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(RewardRecordDO::getRewardDate, rewardDate)
+               .eq(RewardRecordDO::getRewardType, rewardType)
+               .select(RewardRecordDO::getBusinessId);
+        return mapper.selectList(wrapper).stream()
+                .map(RewardRecordDO::getBusinessId)
+                .collect(Collectors.toSet());
     }
 
     /** 查询指定多个奖励类型的所有 SENT 记录（供补偿任务轮询） */

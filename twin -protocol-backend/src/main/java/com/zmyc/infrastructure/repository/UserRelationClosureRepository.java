@@ -6,7 +6,9 @@ import com.zmyc.infrastructure.mapper.UserRelationClosureMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Repository;
 
+import java.math.BigDecimal;
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Repository
 public class UserRelationClosureRepository {
@@ -47,10 +49,37 @@ public class UserRelationClosureRepository {
         return closureMapper.countValidDirectChildren(userId);
     }
 
-    /** 统计某用户的团队总人数 */
+    /** 统计某用户的团队总人数（所有层级） */
     public long countDescendants(Long userId) {
         LambdaQueryWrapper<UserRelationClosureDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserRelationClosureDO::getAncestorId, userId);
         return closureMapper.selectCount(wrapper);
+    }
+
+    /** 分页查询直推下级ID列表 */
+    public List<Long> findDirectChildrenIds(Long userId, int offset, int pageSize) {
+        LambdaQueryWrapper<UserRelationClosureDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserRelationClosureDO::getAncestorId, userId)
+               .eq(UserRelationClosureDO::getDepth, 1)
+               .orderByAsc(UserRelationClosureDO::getId)
+               .last("LIMIT " + offset + ", " + pageSize);
+        return closureMapper.selectList(wrapper).stream()
+                .map(UserRelationClosureDO::getDescendantId)
+                .collect(Collectors.toList());
+    }
+
+    /** 统计某用户的所有直推数（不论是否有效） */
+    public long countAllDirectChildren(Long userId) {
+        return closureMapper.countAllDirectChildren(userId);
+    }
+
+    /** 统计团队有效用户数（所有层级下级中有COMPLETED入金的） */
+    public long countValidTeamMembers(Long userId) {
+        return closureMapper.countValidTeamMembers(userId);
+    }
+
+    /** 统计直推用户的入金总额（USDC，仅COMPLETED状态） */
+    public java.math.BigDecimal sumDirectDepositAmount(Long userId) {
+        return closureMapper.sumDirectDepositAmount(userId);
     }
 }
