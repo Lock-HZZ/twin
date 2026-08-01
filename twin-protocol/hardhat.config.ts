@@ -67,7 +67,7 @@ const config: HardhatUserConfig = {
     },
     polygon: {
       chainId: 0x89,
-      url: "https://rpc-mainnet.matic.quiknode.pro",
+      url: "https://rpc.private.mev-x.com/polygon",
       accounts: process.env.ACCOUNTS?.split(",")
     },
     base_sepolia: {

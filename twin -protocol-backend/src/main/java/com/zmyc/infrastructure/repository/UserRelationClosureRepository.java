@@ -36,6 +36,14 @@ public class UserRelationClosureRepository {
         return closureMapper.findAncestorIds(userId);
     }
 
+    /** 判断某用户是否已绑定直接上级（闭包表中存在 depth=1 的祖先行） */
+    public boolean hasParent(Long userId) {
+        LambdaQueryWrapper<UserRelationClosureDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserRelationClosureDO::getDescendantId, userId)
+               .eq(UserRelationClosureDO::getDepth, 1);
+        return closureMapper.selectCount(wrapper) > 0;
+    }
+
     /** 查询某用户的直接下级 */
     public List<UserRelationClosureDO> findDirectChildren(Long userId) {
         LambdaQueryWrapper<UserRelationClosureDO> wrapper = new LambdaQueryWrapper<>();

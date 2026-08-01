@@ -144,4 +144,11 @@ public class UserDepositRepository {
     public boolean isValidUser(Long userId) {
         return depositMapper.countCompletedDeposits(userId) > 0;
     }
+
+    public UserDepositDO findByWithdrawTxHash(String removeTxHash) {
+        LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(UserDepositDO::getWithdrawTxHash, removeTxHash)
+               .eq(UserDepositDO::getStatus, UserDepositDO.Status.REMOVING);
+        return depositMapper.selectOne(wrapper);
+    }
 }

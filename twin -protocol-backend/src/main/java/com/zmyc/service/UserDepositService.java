@@ -35,9 +35,10 @@ public class UserDepositService {
     /** 合约功能类型：入金固定为 2 */
     private static final int FUNC_DEPOSIT = 2;
 
-    private static final BigDecimal MIN_DEPOSIT = BigDecimal.valueOf(100);
-    private static final BigDecimal DEPOSIT_STEP = BigDecimal.valueOf(100);
     private static final BigDecimal UNLIMITED_QUOTA = BigDecimal.valueOf(999999999L);
+
+    /** 有效直推解除铸造限额的门槛人数 */
+    public static final int UNLOCK_REFERRAL_THRESHOLD = 10;
 
 
     @Autowired
@@ -120,7 +121,8 @@ public class UserDepositService {
 
         // 8. 生成 EIP-712 签名
         long deadline = System.currentTimeMillis() / 1000 + depositConfig.getSignatureTtlSeconds();
-        BigInteger amountWei = amount.toBigInteger().multiply(Decimals.USDC.value.toBigInteger()); // 转换为最小单位（USDC 6位小数）
+        // 转换为最小单位（USDC 6位小数）。先乘以 10^6 再取整，避免 0.001 这类小数被 toBigInteger 截断为 0
+        BigInteger amountWei = amount.multiply(Decimals.USDC.value).toBigInteger();
 
         String signature = Eip712DepositSigner.sign(
                 depositConfig.getSignerPrivateKey(),
@@ -194,13 +196,20 @@ public class UserDepositService {
     }
 
     /**
-     * 校验入金金额：最低100 USDC，且必须是100的整数倍
+     * 校验入金金额：不低于配置的最低金额，且必须是配置步长的整数倍。
+     * 最低金额与步长由 deposit.min-amount / deposit.step-amount 配置（默认 100）。
      */
     private void validateDepositAmount(BigDecimal amount) {
-        if (amount.compareTo(MIN_DEPOSIT) < 0) {
+        BigDecimal minAmount = depositConfig.getMinAmount();
+        BigDecimal stepAmount = depositConfig.getStepAmount();
+
+        if (amount.compareTo(minAmount) < 0) {
+            log.warn("入金金额低于最低限额: amount={}, min={}", amount, minAmount);
             throw new BusinessException(ErrorCode.DEPOSIT_AMOUNT_INVALID);
         }
-        if (amount.remainder(DEPOSIT_STEP).compareTo(BigDecimal.ZERO) != 0) {
+        if (stepAmount != null && stepAmount.compareTo(BigDecimal.ZERO) > 0
+                && amount.remainder(stepAmount).compareTo(BigDecimal.ZERO) != 0) {
+            log.warn("入金金额不是步长的整数倍: amount={}, step={}", amount, stepAmount);
             throw new BusinessException(ErrorCode.DEPOSIT_AMOUNT_INVALID);
         }
     }
@@ -258,8 +267,8 @@ public class UserDepositService {
 
         int validReferrals = userService.countValidReferrals(user.getId());
 
-        // 推荐满10人解除限制
-        if (validReferrals >= 10) {
+        // 有效直推满门槛人数解除限制
+        if (validReferrals >= UNLOCK_REFERRAL_THRESHOLD) {
             return UNLIMITED_QUOTA;
         }
 
@@ -309,6 +318,9 @@ public class UserDepositService {
         long todayEnd = TimeUtils.getTodayEndTimestamp();
         BigDecimal todayTotal = depositRepository.getGlobalDailyOccupiedAmount(todayStart, todayEnd);
 
+        int validReferrals = userService.countValidReferrals(userId);
+        boolean unlimited = validReferrals >= UNLOCK_REFERRAL_THRESHOLD;
+
         UserQuotaInfo info = new UserQuotaInfo();
         info.setTotalQuota(totalQuota);
         info.setUsedQuota(used);
@@ -316,6 +328,11 @@ public class UserDepositService {
         info.setDailyMaxDeposit(dailyMax);
         info.setDailyUsed(todayTotal);
         info.setDailyRemaining(dailyMax.subtract(todayTotal).max(BigDecimal.ZERO));
+        info.setValidReferrals(validReferrals);
+        info.setUnlockReferralThreshold(UNLOCK_REFERRAL_THRESHOLD);
+        info.setMintLimitUnlocked(unlimited);
+        // 今日入金权重（1 + 系统运行天数 × 增长率）
+        info.setCurrentWeight(calculateWeight());
         return info;
     }
 

@@ -29,4 +29,16 @@ public class QuotaInfoResponse {
 
     @Schema(description = "今日剩余总额度（USDC）")
     private BigDecimal dailyRemaining;
+
+    @Schema(description = "有效直推人数")
+    private Integer validReferrals;
+
+    @Schema(description = "解除铸造限额所需的有效直推门槛")
+    private Integer unlockReferralThreshold;
+
+    @Schema(description = "是否已解除铸造限额（有效直推 >= 门槛）")
+    private Boolean mintLimitUnlocked;
+
+    @Schema(description = "今日入金权重（1 + 系统运行天数 × 增长率）")
+    private BigDecimal currentWeight;
 }

@@ -38,9 +38,9 @@ contract TIP is IERC20, Ownable {
 
     mapping(address => bool) public whiteList;
 
-    event burnPoolTokens(uint256 burnAmount, uint256 toBurn, uint256 toDividend);
+    event burnPool(uint256 burnAmount, uint256 toBurn, uint256 toDividend);
     event mint(address indexed to, uint256 amount);
-    event destroyFromLP(uint256 amount);
+    event destroy(uint256 amount);
     
     constructor(address _burner) Ownable(msg.sender) {
         require (_burner != address(0), "Invalid burner address");
@@ -97,7 +97,7 @@ contract TIP is IERC20, Ownable {
         return true;
     }
 
-    function mint(address to, uint256 amount) external onlyOwner {
+    function mintTo(address to, uint256 amount) external onlyOwner {
         require(to != address(0), "ERC20: mint to the zero address");
         require(amount > 0, "Amount must be greater than zero");
 
@@ -164,7 +164,7 @@ contract TIP is IERC20, Ownable {
 
         lastBurnTime = block.timestamp;
         IPair(pair).sync();
-        emit burnPoolTokens(burnAmount, toBurn, toDividend);
+        emit burnPool(burnAmount, toBurn, toDividend);
     }
 
     function destroyFromLP(uint256 amount)  external {
@@ -177,7 +177,7 @@ contract TIP is IERC20, Ownable {
 
         emit Transfer(pair, DEAD_ADDRESS, amount);
         IPair(pair).sync();
-        emit destroyFromLP(amount);
+        emit destroy(amount);
     }
 
     function setDestroyer(address _destroyer) external onlyOwner {

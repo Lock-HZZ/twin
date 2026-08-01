@@ -39,16 +39,7 @@ public class LpRewardReleaseRepository {
     public void updateStatus(List<Long> ids, Integer status, String batchId) {
         if (ids == null || ids.isEmpty()) return;
         long now = System.currentTimeMillis() / 1000;
-        for (Long id : ids) {
-            LpRewardReleaseDO record = mapper.selectById(id);
-            if (record != null) {
-                record.setStatus(status);
-                record.setBatchId(batchId);
-                record.setReleasedAmount(record.getDailyAmount());
-                record.setUpdatedDate(now);
-                mapper.updateById(record);
-            }
-        }
+        mapper.updateStatusByIds(ids, status, batchId, now);
     }
 
     /** 查询用户的LP释放记录 */

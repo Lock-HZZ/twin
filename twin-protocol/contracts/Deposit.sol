@@ -40,6 +40,7 @@ contract Deposit is  Initializable,
 
     event DepositExecuted(
         address indexed user,
+        uint256 indexed nonce,
         uint256 usdcAmount,
         uint256 toDividend,
         uint256 tipBought,
@@ -141,7 +142,7 @@ contract Deposit is  Initializable,
         if (dustUSDC > 0) USDC.transfer(dustReceiver, dustUSDC);
         if (dustTIP > 0) IERC20(tip).transfer(dustReceiver, dustTIP);
 
-        emit DepositExecuted(user, usdcAmount, toDividend, tipReceived, lpAmount, dustUSDC, dustTIP);
+        emit DepositExecuted(user, nonce, usdcAmount, toDividend, tipReceived, lpAmount, dustUSDC, dustTIP);
         return lpAmount;
     }
 

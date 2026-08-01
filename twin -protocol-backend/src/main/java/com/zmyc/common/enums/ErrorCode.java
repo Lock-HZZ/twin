@@ -15,6 +15,10 @@ public enum ErrorCode {
     AUTH_FAILED(1000, "error.auth.failed"),
     USER_NOT_EXISTS(1001, "error.user.not.exists"),
     USER_IS_DISABLED(1002, "error.user.is.disabled"),
+    USER_ALREADY_EXISTS(1003, "error.user.already.exists"),
+    PARENT_NOT_EXISTS(1004, "error.parent.not.exists"),
+    PARENT_IS_SELF(1005, "error.parent.is.self"),
+    PARENT_REQUIRED(1006, "error.parent.required"),
 
     TOKEN_NOT_FOUND(2001, "error.token.not.found"),
 
@@ -52,7 +56,8 @@ public enum ErrorCode {
 
     SIGNATURE_INVALID(7001, "error.signature.invalid"),
     NONCE_REUSED(7002, "error.nonce.reused"),
-    TIMESTAMP_INVALID(7003, "error.timestamp.invalid");
+    TIMESTAMP_INVALID(7003, "error.timestamp.invalid"),
+    RATE_LIMIT_EXCEEDED(7004, "error.rate.limit.exceeded");
 
     private final int code;
     private final String messageKey;

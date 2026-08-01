@@ -48,6 +48,7 @@ public class UserService {
 
     /**
      * 注册新用户（公开方法，供其他服务调用）
+     * 修复：先 save 拿到 snowflake id，再建立闭包表关系。
      */
     @Transactional
     public UserDO registerUser(String address, String invitedCode, String clientIp) {
@@ -57,18 +58,83 @@ public class UserService {
         newUser.setRegistrationIp(clientIp);
         newUser.setLastLoginIp(clientIp);
 
-        if (invitedCode != null && !invitedCode.isEmpty()) {
-            UserDO inviter = userRepository.findByInvitedCode(invitedCode);
-            // 建立闭包表关系
-            closureRepository.insertForNewUser(newUser.getId(), inviter.getId());
-        }
-
         String newInvitedCode = RandomStringUtils.randomAlphanumeric(8);
         newUser.setInvitedCode(newInvitedCode);
 
+        // 先落库，IdType.ASSIGN_ID 会在此时回填 id
         userRepository.save(newUser);
 
+        if (invitedCode != null && !invitedCode.isEmpty()) {
+            UserDO inviter = userRepository.findByInvitedCodeOrNull(invitedCode);
+            if (inviter != null) {
+                closureRepository.insertForNewUser(newUser.getId(), inviter.getId());
+            }
+        }
+
         // 初始化业绩记录
+        performanceRepository.initForNewUser(newUser.getId());
+
+        return newUser;
+    }
+
+    /**
+     * 查询某地址的绑定状态。
+     * @return 该地址是否已注册且已绑定直接上级（可直接登录）
+     */
+    public boolean isBound(String address) {
+        UserDO user = userRepository.findByAddressOrNull(address);
+        if (user == null) {
+            return false;
+        }
+        return closureRepository.hasParent(user.getId());
+    }
+
+    /**
+     * 查询某地址是否已注册。
+     */
+    public boolean isRegistered(String address) {
+        return userRepository.findByAddressOrNull(address) != null;
+    }
+
+    /**
+     * 校验签名后，以「上级钱包地址」注册新用户并绑定上级。
+     * 要求：签名有效、地址未注册、上级存在且不是自己。
+     */
+    @Transactional
+    public UserDO registerWithParent(String address, String signature, String message,
+                                     Long timestamp, String parentAddress, String clientIp) {
+        // 1. 校验签名（verifySignature 返回 true 表示校验未通过）
+        if (verifySignature(address, signature, message, timestamp)) {
+            throw new BusinessException(ErrorCode.SIGNATURE_INVALID);
+        }
+
+        // 2. 地址不能已注册
+        if (userRepository.findByAddressOrNull(address) != null) {
+            throw new BusinessException(ErrorCode.USER_ALREADY_EXISTS);
+        }
+
+        // 3. 上级地址必填且必须存在
+        if (parentAddress == null || parentAddress.trim().isEmpty()) {
+            throw new BusinessException(ErrorCode.PARENT_REQUIRED);
+        }
+        if (parentAddress.equalsIgnoreCase(address)) {
+            throw new BusinessException(ErrorCode.PARENT_IS_SELF);
+        }
+        UserDO parent = userRepository.findByAddressOrNull(parentAddress);
+        if (parent == null) {
+            throw new BusinessException(ErrorCode.PARENT_NOT_EXISTS);
+        }
+
+        // 4. 创建用户并绑定上级
+        UserDO newUser = new UserDO();
+        newUser.setAddress(address);
+        newUser.setEnabled((byte) 1);
+        newUser.setRegistrationIp(clientIp);
+        newUser.setLastLoginIp(clientIp);
+        newUser.setInvitedCode(RandomStringUtils.randomAlphanumeric(8));
+
+        userRepository.save(newUser);
+        closureRepository.insertForNewUser(newUser.getId(), parent.getId());
         performanceRepository.initForNewUser(newUser.getId());
 
         return newUser;

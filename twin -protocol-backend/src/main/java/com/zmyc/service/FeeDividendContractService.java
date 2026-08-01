@@ -17,7 +17,6 @@ import org.web3j.crypto.TransactionEncoder;
 import org.web3j.protocol.Web3j;
 import org.web3j.protocol.core.DefaultBlockParameterName;
 import org.web3j.protocol.core.methods.response.EthSendTransaction;
-import org.web3j.tx.RawTransactionManager;
 import org.web3j.tx.gas.StaticGasProvider;
 import org.web3j.utils.Numeric;
 
@@ -53,9 +52,7 @@ public class FeeDividendContractService {
     @PostConstruct
     public void init() {
         credentials = Credentials.create(dividendConfig.getOperatorPrivateKey());
-        BigInteger gasPrice = dividendConfig.getGasPrice() != null
-                ? BigInteger.valueOf(dividendConfig.getGasPrice())
-                : getNetworkGasPrice();
+        BigInteger gasPrice = getNetworkGasPrice();
         gasProvider = new StaticGasProvider(gasPrice, BigInteger.valueOf(feeDividendConfig.getGasLimit()));
         log.info("FeeDividend合约服务初始化完成: contract={}", feeDividendConfig.getContractAddress());
     }
@@ -104,7 +101,7 @@ public class FeeDividendContractService {
 
             RawTransaction rawTx = RawTransaction.createTransaction(
                     nonce,
-                    gasProvider.getGasPrice(null),
+                    getNetworkGasPrice(),
                     gasProvider.getGasLimit(null),
                     feeDividendConfig.getContractAddress(),
                     BigInteger.ZERO,
@@ -214,7 +211,7 @@ public class FeeDividendContractService {
 
             RawTransaction rawTx = RawTransaction.createTransaction(
                     nonce,
-                    gasProvider.getGasPrice(null),
+                    getNetworkGasPrice(),
                     gasProvider.getGasLimit(null),
                     feeDividendConfig.getContractAddress(),
                     BigInteger.ZERO,
@@ -243,7 +240,8 @@ public class FeeDividendContractService {
 
     private BigInteger getNetworkGasPrice() {
         try {
-            return getWeb3j().ethGasPrice().send().getGasPrice();
+            BigInteger gasPrice = getWeb3j().ethGasPrice().send().getGasPrice();
+            return gasPrice.multiply(BigInteger.valueOf(12)).divide(BigInteger.TEN); // 1.2倍
         } catch (Exception e) {
             log.warn("获取网络Gas价格失败，使用默认值");
             return BigInteger.valueOf(5_000_000_000L);

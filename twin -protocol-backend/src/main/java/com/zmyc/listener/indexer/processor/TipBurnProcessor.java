@@ -39,7 +39,7 @@ public class TipBurnProcessor implements EventProcessor<TipBurnModel> {
 
     @Override
     public Event getEvent() {
-        return new Event("burnPoolTokens", List.of(
+        return new Event("burnPool", List.of(
                 new TypeReference<Uint256>() {},   // burnAmount
                 new TypeReference<Uint256>() {},   // toBurn
                 new TypeReference<Uint256>() {}    // toDividend

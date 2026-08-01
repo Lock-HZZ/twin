@@ -26,7 +26,6 @@ public class ScheduledJobConfig implements ApplicationRunner {
         initStakeDividendJob();
         initRemoveLiquidityConfirmJob();
         initDailyBurnJob();
-        initBurnConfirmJob();
         initFeeDistributionConfirmJob();
         initLpRewardReleaseJob();
     }
@@ -42,7 +41,7 @@ public class ScheduledJobConfig implements ApplicationRunner {
             String triggerName = "depositExpirationTrigger";
             String triggerGroup = "depositGroup";
             String jobClass = "DepositExpirationJob";
-            String cron = "0 */5 * * * ?"; // 每5分钟执行一次
+            String cron = "0 */1 * * * ?"; // 每5分钟执行一次
 
             // 检查任务是否已存在
             if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
@@ -91,7 +90,7 @@ public class ScheduledJobConfig implements ApplicationRunner {
             String triggerName = "removeLiquidityConfirmTrigger";
             String triggerGroup = "depositGroup";
             String jobClass = "RemoveLiquidityConfirmJob";
-            String cron = "0/30 * * * * ?"; // 每30秒执行一次
+            String cron = "0/10 * * * * ?";
 
             if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
                 quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
@@ -129,30 +128,6 @@ public class ScheduledJobConfig implements ApplicationRunner {
     }
 
     /**
-     * 初始化燃烧确认补偿任务
-     * 每5分钟执行一次：监控和补偿未完成的燃烧记录
-     */
-    private void initBurnConfirmJob() {
-        try {
-            String jobName = "burnConfirmJob";
-            String jobGroup = "burnGroup";
-            String triggerName = "burnConfirmTrigger";
-            String triggerGroup = "burnGroup";
-            String jobClass = "BurnConfirmJob";
-            String cron = "0 */5 * * * ?"; // 每5分钟执行一次
-
-            if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
-                quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);
-                log.info("TIP燃烧补偿任务注册成功: cron={}", cron);
-            } else {
-                log.info("TIP燃烧补偿任务已存在，跳过注册");
-            }
-        } catch (Exception e) {
-            log.error("TIP燃烧补偿任务注册失败", e);
-        }
-    }
-
-    /**
      * 初始化手续费分配确认补偿任务
      * 每5分钟执行一次：确认SENT记录，重发PENDING记录
      */
@@ -163,7 +138,7 @@ public class ScheduledJobConfig implements ApplicationRunner {
             String triggerName = "feeDistributionConfirmTrigger";
             String triggerGroup = "feeGroup";
             String jobClass = "FeeDistributionConfirmJob";
-            String cron = "0 */5 * * * ?";
+            String cron = "0/20 * * * * ?";
 
             if (!quartzJobService.checkJobExists(jobName, jobGroup)) {
                 quartzJobService.addJob(jobName, jobGroup, triggerName, triggerGroup, jobClass, cron);

@@ -1,24 +1,24 @@
 server:
   port: 8080
   servlet:
-    context-path: /bolt-tiger
+    context-path: /api
 
 spring:
   application:
     name: bolt-tiger
 
   datasource:
-    url: jdbc:mysql://187.127.108.248:3306/benefer?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
+    url: jdbc:mysql://localhost:3306/twin?useUnicode=true&characterEncoding=utf8&useSSL=false&serverTimezone=GMT%2B8&allowPublicKeyRetrieval=true
     driver-class-name: com.mysql.cj.jdbc.Driver
     username: root
-    password: b2a577e2949b5e8c
+    password: root123456
 
   data:
     redis:
-      password: duolaimi123
-      host: 187.127.108.248
+      password: redis123456
+      host: localhost
       port: 6379
-      database: 7
+      database: 0
 
   quartz:
     job-store-type: jdbc
@@ -67,15 +67,19 @@ LOG_LEVEL: info
 # 入金签名配置（对应合约 Deposit.sol 的 EIP-712 域）
 deposit:
   # signer 私钥（合约 signer 地址对应的私钥），生产环境请用环境变量注入
-  signer-private-key: ${DEPOSIT_SIGNER_PRIVATE_KEY:0x0000000000000000000000000000000000000000000000000000000000000000}
+  signer-private-key: ${DEPOSIT_SIGNER_PRIVATE_KEY:5126dfca302aee2ac31b9dd23b3d17b4c745f15ac8efeb9be149d658143e22d3}
   # 入金合约地址（EIP-712 verifyingContract）
-  contract-address: ${DEPOSIT_CONTRACT_ADDRESS:0x0000000000000000000000000000000000000000}
-  # 链ID
-  chain-id: ${DEPOSIT_CHAIN_ID:56}
+  contract-address: ${DEPOSIT_CONTRACT_ADDRESS:0x17cA8f831DDF0C6845A77f7c3F1945c14b5F96e1}
+  # 链ID（Polygon 主网 137）
+  chain-id: ${DEPOSIT_CHAIN_ID:137}
   domain-name: TwinProtocolDeposit
   domain-version: "1"
   # 签名有效期（秒）
   signature-ttl-seconds: 600
+  # 最低入金金额（USDC）。测试环境调小便于联调，生产按业务改回 100
+  min-amount: ${DEPOSIT_MIN_AMOUNT:0.001}
+  # 入金金额步长（USDC），入金金额必须是该值的整数倍
+  step-amount: ${DEPOSIT_STEP_AMOUNT:0.001}
 
 bamboo:
   is-open: true
@@ -91,17 +95,30 @@ bamboo:
       rpc-node-url: wss://polygon-bor-rpc.publicnode.com
       event-listener:
         contract-event-definitions:
-          "0x173e7171d4188d6d8faa0889454b0170d835278a":
+          "0x17cA8f831DDF0C6845A77f7c3F1945c14b5F96e1":
             - signature: "DepositExecuted(uint256 indexed stakeId, address indexed user, uint256 usdcAmount, uint256 toDividend, uint256 tipBought, uint256 liquidity, uint256 dustUSDC, uint256 dustTIP)"
               signature-hash: "0x3e1f8c5d4b6f9e2a1c3b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5g"
               description: "入金事件"
-          "0x173e7171d4188d6d8faa0889454b0170d835278b":
+          "0xe2A0891d87F0E291F976FdDf558CFa9BA9A05d1A":
             - signature: "Staked(address indexed user, uint256 amount, uint256 plan, uint256 startTime, uint256 endTime)"
               signature-hash: "0x4f5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a"
               description: "质押事件"
             - signature: "Withdrawn(uint256 indexed stakeId, address indexed user, uint256 amount)"
               signature-hash: "0x4f5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a"
               description: "解押事件"
+          "0x79aD7dd38b40b8771f718e2320c86638bB79a944":
+            - signature: "Withdraw(address indexed user, uint8 indexed rewardType, uint8 indexed assetType, uint256 amount, uint256 fee)"
+              signature-hash: "0x5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b"
+              description: "分红提取事件"
+          "0x3f098643fBe056EA88aabF54afe36CAeb1406978":
+            - signature: "RemoveLiquidity(address indexed user, uint256 liquidity, uint256 usdcOut, uint256 tipToDividend)"
+              signature-hash: "0x6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b7c"
+              description: "移除流动性事件"
+          "0x9E53704F1a0D7Cd0621Ca9b343605C35E4A5134A":
+            - signature: "burnPool(uint256 burnAmount, uint256 toBurn, uint256 toDividend)"
+              signature-hash: "0x7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a6b7c8d"
+              description: "燃烧底池事件"
+
 
 springdoc:
   api-docs:
@@ -112,3 +129,31 @@ springdoc:
 system:
   start:
     timestamp: 1785081600
+
+trade:
+  chain-id: 137
+  operator-private-key: "0x173e7171d4188d6d8faa0889454b0170d835278a"
+  contract-address: "0x173e7171d4188d6d8faa0889454b0170d835278a"
+
+dividend:
+  contract:
+    # 分红合约地址（部署后填写）
+    contract-address: "0x173e7171d4188d6d8faa0889454b0170d835278a"
+
+    # RPC 节点地址
+    # Polygon 主网: https://polygon-rpc.com
+    # Mumbai 测试网: https://rpc-mumbai.maticvigil.com
+    rpc-url: https://polygon-rpc.com
+
+    # 操作员私钥（用于签名交易，需要有 operator 权限）
+    # 注意：生产环境请使用环境变量或加密存储
+    operator-private-key: "0x173e7171d4188d6d8faa0889454b0170d835278a"
+
+    gas-limit: 3000000
+
+    chain-id: 137
+
+fee:
+  dividend:
+    contract:
+      contract-address: "0x173e7171d4188d6d8faa0889454b0170d835278a"

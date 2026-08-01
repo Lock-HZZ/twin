@@ -47,6 +47,10 @@ public class DepositController {
         response.setDailyMaxDeposit(quotaInfo.getDailyMaxDeposit());
         response.setDailyUsed(quotaInfo.getDailyUsed());
         response.setDailyRemaining(quotaInfo.getDailyRemaining());
+        response.setValidReferrals(quotaInfo.getValidReferrals());
+        response.setUnlockReferralThreshold(quotaInfo.getUnlockReferralThreshold());
+        response.setMintLimitUnlocked(quotaInfo.getMintLimitUnlocked());
+        response.setCurrentWeight(quotaInfo.getCurrentWeight());
 
         return ApiResponse.success("获取额度信息成功", response);
     }

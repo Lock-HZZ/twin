@@ -21,9 +21,6 @@ public class TradeConfig {
     /** 链ID */
     private Long chainId;
 
-    /** Gas Price（可选，不配置则使用网络当前价格） */
-    private Long gasPrice;
-
     /** Gas Limit */
     private Long gasLimit = 500000L;
 }

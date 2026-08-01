@@ -104,7 +104,7 @@ public class AkSkInterceptor implements HandlerInterceptor {
             if (!SignatureUtil.isTimestampValid(timestamp, akSkConfig.getSignatureExpiration())) {
                 log.error("时间戳已过期 - IP: {}, URI: {}, Timestamp: {}, Current: {}",
                         getClientIp(request), request.getRequestURI(), timestamp, SignatureUtil.getCurrentTimestamp());
-                throw new BusinessException(ErrorCode.SIGNATURE_EXPIRED);
+                throw new BusinessException(ErrorCode.TIMESTAMP_INVALID);
             }
             
             Boolean exists = redisTemplate.hasKey(NONCE_PREFIX + nonce);
@@ -143,7 +143,7 @@ public class AkSkInterceptor implements HandlerInterceptor {
             throw e;
         } catch (Exception e) {
             log.error("AK/SK认证异常", e);
-            throw new BusinessException(ErrorCode.AUTH_ERROR);
+            throw new BusinessException(ErrorCode.AUTH_FAILED);
         }
     }
     

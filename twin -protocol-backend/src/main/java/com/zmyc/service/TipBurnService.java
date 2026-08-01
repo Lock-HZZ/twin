@@ -68,10 +68,6 @@ public class TipBurnService {
 
         // 幂等检查：今日是否已有燃烧记录
         TipBurnRecordDO existing = burnRecordRepository.findByBurnDate(today);
-        if (existing != null) {
-            log.warn("今日燃烧任务已存在，跳过执行: burnDate={}, status={}", today, existing.getStatus());
-            return;
-        }
 
         // 链上时间检查：读合约 lastBurnTime，判断是否已是新的一天
         if (hasAlreadyBurnedToday()) {
@@ -84,15 +80,17 @@ public class TipBurnService {
         log.info("开始执行每日燃烧任务: burnDate={}, burnRate={}%", today, burnRate / 100.0);
 
         // 创建待执行记录
-        TipBurnRecordDO record = new TipBurnRecordDO();
-        record.setBurnDate(today);
-        record.setBurnRate(burnRate);
-        record.setStatus(TipBurnRecordDO.Status.PENDING);
-        record.setRetryCount(0);
-        burnRecordRepository.save(record);
+        if (existing == null) {
+            existing = new TipBurnRecordDO();
+            existing.setBurnDate(today);
+            existing.setBurnRate(burnRate);
+            existing.setStatus(TipBurnRecordDO.Status.PENDING);
+            existing.setRetryCount(0);
+            burnRecordRepository.save(existing);
+        }
 
         // 非阻塞发送，失败会自行落库 FAILED，补偿任务重试
-        executeBurn(record);
+        executeBurn(existing);
     }
 
     /**
@@ -146,7 +144,7 @@ public class TipBurnService {
             record.setFailReason(e.getMessage());
             record.setRetryCount(record.getRetryCount() + 1);
             burnRecordRepository.save(record);
-            log.error("燃烧交易提交失败，等待补偿任务重试: recordId={}, retryCount={}",
+            log.error("燃烧交易提交失败，等待链上确认: recordId={}, retryCount={}",
                     record.getId(), record.getRetryCount(), e);
         }
     }

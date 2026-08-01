@@ -39,6 +39,25 @@ public class UserRepository {
         return user;
     }
 
+    /**
+     * 根据地址查询用户，不存在时返回 null（不抛异常）
+     * 用于登录前判断用户是否已注册/绑定上级
+     */
+    public UserDO findByAddressOrNull(String address) {
+        QueryWrapper<UserDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("address", address);
+        return userMapper.selectOne(queryWrapper);
+    }
+
+    /**
+     * 根据邀请码查询用户，不存在时返回 null（不抛异常）
+     */
+    public UserDO findByInvitedCodeOrNull(String invitedCode) {
+        QueryWrapper<UserDO> queryWrapper = new QueryWrapper<>();
+        queryWrapper.eq("invited_code", invitedCode);
+        return userMapper.selectOne(queryWrapper);
+    }
+
     public void save(UserDO user) {
         userMapper.insert(user);
     }

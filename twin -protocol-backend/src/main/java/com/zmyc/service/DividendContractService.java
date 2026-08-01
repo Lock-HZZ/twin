@@ -59,9 +59,7 @@ public class DividendContractService {
             credentials = Credentials.create(config.getOperatorPrivateKey());
             log.info("操作员地址: {}", credentials.getAddress());
 
-            BigInteger gasPrice = config.getGasPrice() != null
-                    ? BigInteger.valueOf(config.getGasPrice())
-                    : getNetworkGasPrice();
+            BigInteger gasPrice =  getNetworkGasPrice();
             gasProvider = new StaticGasProvider(gasPrice, BigInteger.valueOf(config.getGasLimit()));
 
             log.info("分红合约服务初始化完成: chainId={}, contract={}",

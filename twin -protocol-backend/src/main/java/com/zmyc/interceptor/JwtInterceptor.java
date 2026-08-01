@@ -33,13 +33,13 @@ public class JwtInterceptor implements HandlerInterceptor {
         String authorizationHeader = request.getHeader("Authorization");
         
         if (!StringUtils.hasText(authorizationHeader) || !authorizationHeader.startsWith("Bearer ")) {
-            throw new BusinessException(com.zmyc.common.enums.ErrorCode.UNAUTHENTICATED);
+            throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_FAILED);
         }
         
         String token = authorizationHeader.substring(7);
         
         if (!StringUtils.hasText(token)) {
-            throw new BusinessException(com.zmyc.common.enums.ErrorCode.UNAUTHENTICATED);
+            throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_FAILED);
         }
         
         try {
@@ -48,7 +48,7 @@ public class JwtInterceptor implements HandlerInterceptor {
             
             // 验证token是否过期
             if (jwtUtil.isTokenExpired(token)) {
-                throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_EXPIRED);
+                throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_FAILED);
             }
             
             // 从数据库查询用户
@@ -68,12 +68,12 @@ public class JwtInterceptor implements HandlerInterceptor {
             
         } catch (JwtException e) {
             log.warn("JWT验证失败: {}", e.getMessage());
-            throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_INVALID);
+            throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_FAILED);
         } catch (BusinessException e) {
             throw e;
         } catch (Exception e) {
             log.error("JWT验证异常", e);
-            throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_ERROR);
+            throw new BusinessException(com.zmyc.common.enums.ErrorCode.AUTH_FAILED);
         }
     }
     

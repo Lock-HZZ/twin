@@ -52,6 +52,9 @@ public class LpRewardReleaseService {
     @Autowired
     private DividendContractService dividendContractService;
 
+    @Autowired
+    private UserLevelService  userLevelService;
+
     private static final int RELEASE_DAYS = 60;
     private static final int BATCH_SIZE = 200;
 
@@ -84,6 +87,11 @@ public class LpRewardReleaseService {
             log.warn("未找到对应的入金订单: removeTxHash={}", removeTxHash);
             return;
         }
+
+        deposit.setStatus(UserDepositDO.Status.REMOVED);
+        depositRepository.save(deposit);
+        // 移除LP后，该用户的推荐人链上可能失去一个有效直推，需更新等级
+        userLevelService.updateUserAndAncestorsLevel(deposit.getUserId());
 
         // 生成60条释放记录
         BigDecimal dailyAmount = tipToDividend.divide(new BigDecimal(RELEASE_DAYS), 18, RoundingMode.DOWN);

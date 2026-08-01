@@ -10,6 +10,7 @@ import com.zmyc.common.util.Web3jUtils;
 import com.zmyc.infrastructure.entity.UserDepositDO;
 import com.zmyc.infrastructure.repository.UserDepositRepository;
 import jakarta.annotation.PostConstruct;
+import lombok.AllArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.redis.core.RedisTemplate;
@@ -208,31 +209,6 @@ public class TradeContractService {
         }
     }
 
-    // ------------------------------------------------------------------ //
-    //  链上事件回调                                                         //
-    // ------------------------------------------------------------------ //
-
-    /**
-     * 处理链上 RemoveLiquidity 事件（由事件监听器调用）
-     */
-    @Transactional
-    public void processRemoveLiquidityEvent(String user, BigDecimal liquidity, BigDecimal usdcOut, BigDecimal tipToDividend, String txHash) {
-        UserDepositDO deposit = depositRepository.findByWithdrawTxHash(txHash);
-        if (deposit == null) {
-            log.warn("未找到对应的入金订单: txHash={}", txHash);
-            return;
-        }
-
-        deposit.setStatus(UserDepositDO.Status.REMOVED);
-        deposit.setLiquidity(BigDecimal.ZERO);
-        depositRepository.save(deposit);
-
-        // 移除LP后，该用户的推荐人链上可能失去一个有效直推，需更新等级
-        userLevelService.updateUserAndAncestorsLevel(deposit.getUserId());
-
-        log.info("移除LP事件处理完成: depositId={}, usdcOut={}, tipToDividend={}, txHash={}",
-                deposit.getId(), usdcOut, tipToDividend, txHash);
-    }
 
     // ------------------------------------------------------------------ //
     //  私有：发送合约调用                                                   //
