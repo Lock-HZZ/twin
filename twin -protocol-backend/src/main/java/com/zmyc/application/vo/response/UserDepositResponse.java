@@ -30,9 +30,18 @@ public class UserDepositResponse {
     @Schema(description = "铸造Hash")
     private String txHash;
 
-    @Schema(description = "状态：0-待处理，1-已完成，2-失败，3-已过期")
+    @Schema(description = "状态：0-待处理，1-已完成，2-失败，3-移除中，4-已出局")
     private Integer status;
 
     @Schema(description = "创建时间")
     private Long createdDate;
+
+    @Schema(description = "移除LP的交易哈希（已出局订单）")
+    private String withdrawTxHash;
+
+    @Schema(description = "移除LP时间（10位时间戳，已出局订单）")
+    private Long removedDate;
+
+    @Schema(description = "锁仓TIP总额（已出局订单，60天线性释放）")
+    private BigDecimal lockedTip;
 }

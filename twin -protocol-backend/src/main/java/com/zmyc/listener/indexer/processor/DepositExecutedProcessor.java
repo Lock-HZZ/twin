@@ -64,7 +64,7 @@ public class DepositExecutedProcessor implements EventProcessor<DepositExecutedM
         String[] topics = eventLog.getTopics().split(",");
 
         String userAddress = "0x" + topics[1].substring(26);
-        Long nonce = new BigInteger(topics[2], 16).longValue();
+        Long nonce = new BigInteger(topics[2].substring(2), 16).longValue();
 
         String data = eventLog.getData();
         List<Type> decodedValues = FunctionReturnDecoder.decode(

@@ -63,6 +63,9 @@ public class UserDepositService {
     private UserLevelService userLevelService;
 
     @Autowired
+    private LpRewardReleaseRepository lpRewardReleaseRepository;
+
+    @Autowired
     private RedisTemplate<String, Object> redisTemplate;
 
     @Value("${system.start.timestamp}")
@@ -395,6 +398,14 @@ public class UserDepositService {
             response.setTxHash(deposit.getTxHash());
             response.setStatus(deposit.getStatus());
             response.setCreatedDate(deposit.getCreatedDate());
+
+            // 已出局订单：补充移除Hash、移除时间与锁仓TIP总额（供前端展示60天解锁进度）
+            if (UserDepositDO.Status.REMOVED.equals(deposit.getStatus())
+                    || UserDepositDO.Status.REMOVING.equals(deposit.getStatus())) {
+                response.setWithdrawTxHash(deposit.getWithdrawTxHash());
+                response.setRemovedDate(deposit.getLastUpdatedDate());
+                response.setLockedTip(lpRewardReleaseRepository.findTotalAmountByDepositId(deposit.getId()));
+            }
 
             return response;
         }).collect(Collectors.toList());

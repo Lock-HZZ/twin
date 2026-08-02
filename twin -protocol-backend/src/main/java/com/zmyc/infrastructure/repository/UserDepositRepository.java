@@ -97,22 +97,24 @@ public class UserDepositRepository {
         return depositMapper.selectOne(wrapper);
     }
 
-    /** 分页查询用户入金列表，支持状态筛选 */
+    /** 分页查询用户入金列表，支持状态筛选（statusFilter 为空时默认查持仓中 COMPLETED） */
     public List<UserDepositDO> findByUserIdWithPage(Long userId, Integer statusFilter, Integer offset, Integer pageSize) {
+        Integer status = statusFilter != null ? statusFilter : UserDepositDO.Status.COMPLETED;
         LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserDepositDO::getUserId, userId);
-        wrapper.eq(UserDepositDO::getStatus, UserDepositDO.Status.COMPLETED);
+        wrapper.eq(UserDepositDO::getStatus, status);
         wrapper.orderByDesc(UserDepositDO::getCreatedDate)
                .last("LIMIT " + offset + ", " + pageSize);
 
         return depositMapper.selectList(wrapper);
     }
 
-    /** 统计用户入金记录总数，支持状态筛选 */
+    /** 统计用户入金记录总数，支持状态筛选（statusFilter 为空时默认查持仓中 COMPLETED） */
     public long countByUserId(Long userId, Integer statusFilter) {
+        Integer status = statusFilter != null ? statusFilter : UserDepositDO.Status.COMPLETED;
         LambdaQueryWrapper<UserDepositDO> wrapper = new LambdaQueryWrapper<>();
         wrapper.eq(UserDepositDO::getUserId, userId);
-        wrapper.eq(UserDepositDO::getStatus, UserDepositDO.Status.COMPLETED);
+        wrapper.eq(UserDepositDO::getStatus, status);
         return depositMapper.selectCount(wrapper);
     }
 

@@ -49,4 +49,15 @@ public class LpRewardReleaseRepository {
                .orderByDesc(LpRewardReleaseDO::getReleaseDate);
         return mapper.selectList(wrapper);
     }
+
+    /**
+     * 查询某入金订单的锁仓TIP总额（60条释放记录的 totalAmount 相同，取任意一条即可）。
+     * 无释放计划时返回 null。
+     */
+    public java.math.BigDecimal findTotalAmountByDepositId(Long depositId) {
+        LambdaQueryWrapper<LpRewardReleaseDO> wrapper = new LambdaQueryWrapper<>();
+        wrapper.eq(LpRewardReleaseDO::getDepositId, depositId).last("LIMIT 1");
+        LpRewardReleaseDO one = mapper.selectOne(wrapper);
+        return one != null ? one.getTotalAmount() : null;
+    }
 }

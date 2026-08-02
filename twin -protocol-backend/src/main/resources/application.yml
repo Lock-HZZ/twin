@@ -67,7 +67,7 @@ LOG_LEVEL: info
 # 入金签名配置（对应合约 Deposit.sol 的 EIP-712 域）
 deposit:
   # signer 私钥（合约 signer 地址对应的私钥），生产环境请用环境变量注入
-  signer-private-key: ${DEPOSIT_SIGNER_PRIVATE_KEY:5126dfca302aee2ac31b9dd23b3d17b4c745f15ac8efeb9be149d658143e22d3}
+  signer-private-key: ${DEPOSIT_SIGNER_PRIVATE_KEY:0x17cA8f831DDF0C6845A77f7c3F1945c14b5F96e1}
   # 入金合约地址（EIP-712 verifyingContract）
   contract-address: ${DEPOSIT_CONTRACT_ADDRESS:0x17cA8f831DDF0C6845A77f7c3F1945c14b5F96e1}
   # 链ID（Polygon 主网 137）
@@ -75,7 +75,7 @@ deposit:
   domain-name: TwinProtocolDeposit
   domain-version: "1"
   # 签名有效期（秒）
-  signature-ttl-seconds: 600
+  signature-ttl-seconds: 180
   # 最低入金金额（USDC）。测试环境调小便于联调，生产按业务改回 100
   min-amount: ${DEPOSIT_MIN_AMOUNT:0.001}
   # 入金金额步长（USDC），入金金额必须是该值的整数倍
@@ -92,16 +92,16 @@ bamboo:
   blockchains:
     polygon:
       id: 137
-      rpc-node-url: wss://polygon-bor-rpc.publicnode.com
+      rpc-node-url: https://lb.drpc.live/polygon/AuFcsRGMC08It5Y8IeK6urBaDLUf-mwR8JaMgtEkfQq9
       event-listener:
         contract-event-definitions:
           "0x17cA8f831DDF0C6845A77f7c3F1945c14b5F96e1":
             - signature: "DepositExecuted(uint256 indexed stakeId, address indexed user, uint256 usdcAmount, uint256 toDividend, uint256 tipBought, uint256 liquidity, uint256 dustUSDC, uint256 dustTIP)"
-              signature-hash: "0x3e1f8c5d4b6f9e2a1c3b4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5g"
+              signature-hash: "0x11edef9b45f0210a0e1f02a508db6fda85fc3dd3d9891810409e1c77468e3d06"
               description: "入金事件"
           "0xe2A0891d87F0E291F976FdDf558CFa9BA9A05d1A":
             - signature: "Staked(address indexed user, uint256 amount, uint256 plan, uint256 startTime, uint256 endTime)"
-              signature-hash: "0x4f5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a"
+              signature-hash: "0xa26c9ce7e5e8c0b316b21906f4538c8002dcdae14c090dbcfca25bfb8b0947ba"
               description: "质押事件"
             - signature: "Withdrawn(uint256 indexed stakeId, address indexed user, uint256 amount)"
               signature-hash: "0x4f5e6d7c8b9a0b1c2d3e4f5g6h7i8j9k0l1m2n3o4p5q6r7s8t9u0v1w2x3y4z5a"
